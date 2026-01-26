@@ -1,12 +1,15 @@
 streamlit==1.31.1
 
+# TensorFlow stack (Keras 2.x, NOT Keras 3)
 tensorflow==2.15.0
 keras==2.15.0
 
+# Hugging Face (TF + PT mixed usage)
 transformers==4.36.2
 torch==2.1.2
-sentencepiece
+sentencepiece==0.2.1
+huggingface_hub==0.36.0
 
-numpy<2.0
-Pillow
-huggingface_hub
+# Core utilities
+numpy==1.26.4
+pillow==10.4.0

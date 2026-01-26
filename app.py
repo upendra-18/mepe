@@ -27,30 +27,28 @@ st.title("MEPE"
 # Load models (cached)
 # -------------------------------
 @st.cache_resource
+@st.cache_resource
 def load_models():
-    # ---- Text model (HF + TF backend) ----
     tokenizer = AutoTokenizer.from_pretrained("models/text_emotion_hf")
+
     text_encoder = TFDistilBertModel.from_pretrained(
         "models/text_emotion_hf",
-        from_pt=False
     )
     text_encoder.trainable = False
 
-    # ---- Face model (Keras 3 native) ----
     face_model = keras.models.load_model(
         "models/face_emotion/model.keras",
         compile=False
     )
 
-    # ---- LLM (PyTorch backend, isolated) ----
     llm = pipeline(
         "text2text-generation",
         model="google/flan-t5-base",
         device=-1
     )
 
-
     return tokenizer, text_encoder, face_model, llm
+
 
 
 tokenizer, text_encoder, face_model, llm = load_models()
@@ -60,15 +58,12 @@ tokenizer, text_encoder, face_model, llm = load_models()
 # Inference helpers
 # -------------------------------
 def text_embedding(text: str) -> np.ndarray:
-    tokens = tokenizer(
-        text,
-        return_tensors="tf",
-        padding=True,
-        truncation=True
-    )
-    outputs = text_encoder(**tokens)
-    emb = tf.reduce_mean(outputs.last_hidden_state, axis=1)
-    return emb.numpy()[0]
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+    with torch.no_grad():
+        outputs = text_encoder(**inputs)
+    emb = outputs.last_hidden_state.mean(dim=1)
+    return emb.cpu().numpy()[0]
+
 
 
 def face_embedding(img: Image.Image) -> np.ndarray:
