@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+
+# Streamlit
+.streamlit/cache/
+
+# HuggingFace / Transformers
+.cache/
+hf_cache/
+
+# TensorFlow / Keras
+logs/
+*.h5
+*.ckpt
+*.pb
+*.index
+*.data-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
