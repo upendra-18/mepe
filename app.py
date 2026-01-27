@@ -11,6 +11,7 @@ from PIL import Image
 import json
 
 import tensorflow as tf
+from tensorflow.keras.layers import Lambda
 from transformers import AutoTokenizer, TFDistilBertModel, pipeline
 
 # -------------------------------
@@ -34,10 +35,14 @@ def load_models():
     )
     text_encoder.trainable = False
 
-    # ---------- FACE MODEL (LOCAL / GITHUB) ----------
+    # ---------- FACE MODEL (REAL FIX) ----------
     face_model = tf.keras.models.load_model(
         "models/face_emotion/model.keras",
-        compile=False
+        compile=False,
+        custom_objects={
+            "Lambda": Lambda,
+            "tf": tf
+        }
     )
 
     with open("models/face_emotion/classes.json", "r") as f:
@@ -53,7 +58,6 @@ def load_models():
     return tokenizer, text_encoder, face_model, face_classes, llm
 
 
-# ✅ CORRECT unpacking (5 values)
 tokenizer, text_encoder, face_model, face_classes, llm = load_models()
 
 # -------------------------------
