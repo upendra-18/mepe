@@ -34,16 +34,18 @@ def load_models():
     )
     text_encoder.trainable = False
 
-    # ---------- FACE MODEL ----------
+    # ---------- FACE MODEL (FINAL FIX) ----------
     face_model_path = hf_hub_download(
         repo_id="upendrareddy1/face-emotion-keras",
         filename="model.keras"
     )
 
+    # 🔥 THIS IS THE REAL FIX
     face_model = tf.keras.models.load_model(
         face_model_path,
         compile=False,
-        safe_mode=False
+        safe_mode=False,
+        custom_objects={"tf": tf}
     )
 
     # ---------- LLM ----------
@@ -127,7 +129,7 @@ if st.button("Analyze & Respond"):
 
         t_emb = text_embedding(user_text)
         f_emb = face_embedding(img)
-        _ = gated_fusion(t_emb, f_emb)  # fused embedding (reserved for future use)
+        _ = gated_fusion(t_emb, f_emb)
 
         persona = persona_control()
         prompt = build_prompt(user_text, persona)
