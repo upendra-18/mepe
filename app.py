@@ -40,7 +40,7 @@ def load_models():
 
     # ---------- FACE MODEL (FIX) ----------
     face_model_path = hf_hub_download(
-        repo_id="upendra/face-emotion-keras",
+        repo_id="upendrareddy1/face-emotion-keras",
         filename="model.keras"
     )
 
