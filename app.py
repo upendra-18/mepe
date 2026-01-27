@@ -43,7 +43,8 @@ def load_models():
     # ✅ LOCAL MODEL FROM GITHUB (FINAL)
     face_model = tf.keras.models.load_model(
         "models/face_emotion/model.keras",
-        compile=False
+        compile=False,
+        safe_mode=False
     )
 
     llm = pipeline(
