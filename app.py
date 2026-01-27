@@ -1,5 +1,5 @@
 # ================================
-# MEPE Streamlit App (FINAL – DEPLOYMENT SAFE)
+# MEPE Streamlit App (FINAL – ACTUALLY STABLE)
 # ================================
 
 import os
@@ -16,6 +16,10 @@ from transformers import (
     pipeline
 )
 
+# 🔑 IMPORT THESE — THIS IS THE FIX
+from keras.layers import GetItem
+from keras.ops import stack
+
 # -------------------------------
 # Streamlit config
 # -------------------------------
@@ -27,21 +31,11 @@ st.set_page_config(
 st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 
 # -------------------------------
-# Face model loader (PORTABLE)
-# -------------------------------
-def load_face_model():
-    with open("models/face_emotion/model.json", "r") as f:
-        model = tf.keras.models.model_from_json(f.read())
-
-    model.load_weights("models/face_emotion/model.weights.h5")
-    return model
-
-# -------------------------------
-# Load models (cached)
+# Load models (CACHED, FIXED)
 # -------------------------------
 @st.cache_resource
 def load_models():
-    # ---- TEXT MODEL ----
+    # ---------- TEXT ----------
     tokenizer = AutoTokenizer.from_pretrained(
         "upendrareddy1/mepe-text-emotion"
     )
@@ -51,10 +45,19 @@ def load_models():
     )
     text_encoder.trainable = False
 
-    # ---- FACE MODEL (SAFE) ----
-    face_model = load_face_model()
+    # ---------- FACE MODEL (THE REAL FIX) ----------
+    custom_objects = {
+        "GetItem": GetItem,
+        "Stack": stack,
+    }
 
-    # ---- LLM ----
+    face_model = tf.keras.models.load_model(
+        "models/face_emotion/model.keras",
+        compile=False,
+        custom_objects=custom_objects
+    )
+
+    # ---------- LLM ----------
     llm = pipeline(
         "text2text-generation",
         model="google/flan-t5-base",
@@ -83,9 +86,9 @@ def text_embedding(text: str) -> np.ndarray:
 
 
 def face_embedding(img: Image.Image) -> np.ndarray:
-    img = img.convert("L").resize((48, 48))
+    img = img.convert("RGB").resize((224, 224))
     arr = np.array(img, dtype="float32") / 255.0
-    arr = arr.reshape(1, 48, 48, 1)
+    arr = np.expand_dims(arr, axis=0)
     return face_model.predict(arr, verbose=0)[0]
 
 
@@ -121,6 +124,7 @@ User message:
 Response:
 """.strip()
 
+
 # -------------------------------
 # UI
 # -------------------------------
@@ -140,10 +144,7 @@ if st.button("Analyze & Respond"):
         persona = persona_control()
         prompt = build_prompt(user_text, persona)
 
-        response = llm(
-            prompt,
-            max_new_tokens=200
-        )[0]["generated_text"]
+        response = llm(prompt, max_new_tokens=200)[0]["generated_text"]
 
         st.subheader("Detected Persona")
         st.json(persona)
