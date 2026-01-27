@@ -10,7 +10,6 @@ import numpy as np
 from PIL import Image
 
 import tensorflow as tf
-import keras
 from transformers import AutoTokenizer, TFDistilBertModel, pipeline
 
 # -------------------------------
@@ -24,9 +23,7 @@ st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 # -------------------------------
 @st.cache_resource
 def load_models():
-    from transformers import AutoTokenizer, TFDistilBertModel, pipeline
     from huggingface_hub import hf_hub_download
-    import keras
 
     # ---------- TEXT MODEL ----------
     tokenizer = AutoTokenizer.from_pretrained(
@@ -38,13 +35,14 @@ def load_models():
     )
     text_encoder.trainable = False
 
-    # ---------- FACE MODEL (FIX) ----------
+    # ---------- FACE MODEL (FIXED) ----------
     face_model_path = hf_hub_download(
         repo_id="upendrareddy1/face-emotion-keras",
         filename="model.keras"
     )
 
-    face_model = keras.models.load_model(
+    # 🔧 FIX: use tf.keras, NOT keras
+    face_model = tf.keras.models.load_model(
         face_model_path,
         compile=False
     )
@@ -57,7 +55,6 @@ def load_models():
     )
 
     return tokenizer, text_encoder, face_model, llm
-
 
 
 tokenizer, text_encoder, face_model, llm = load_models()
