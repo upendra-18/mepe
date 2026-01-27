@@ -24,6 +24,11 @@ st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 # -------------------------------
 @st.cache_resource
 def load_models():
+    from transformers import AutoTokenizer, TFDistilBertModel, pipeline
+    from huggingface_hub import hf_hub_download
+    import keras
+
+    # ---------- TEXT MODEL ----------
     tokenizer = AutoTokenizer.from_pretrained(
         "upendrareddy1/mepe-text-emotion"
     )
@@ -33,11 +38,18 @@ def load_models():
     )
     text_encoder.trainable = False
 
+    # ---------- FACE MODEL (FIX) ----------
+    face_model_path = hf_hub_download(
+        repo_id="upendra/face-emotion-keras",
+        filename="model.keras"
+    )
+
     face_model = keras.models.load_model(
-        "https://huggingface.co/upendra/face-emotion-keras/resolve/main/model.keras",
+        face_model_path,
         compile=False
     )
 
+    # ---------- LLM ----------
     llm = pipeline(
         "text2text-generation",
         model="google/flan-t5-base",
@@ -45,6 +57,7 @@ def load_models():
     )
 
     return tokenizer, text_encoder, face_model, llm
+
 
 
 tokenizer, text_encoder, face_model, llm = load_models()
