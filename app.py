@@ -30,9 +30,10 @@ st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 # -------------------------------
 # Load models (CACHED, STABLE)
 # -------------------------------
+from face_model_builder import build_face_model
+
 @st.cache_resource
 def load_models():
-    # ---------- TEXT ----------
     tokenizer = AutoTokenizer.from_pretrained(
         "upendrareddy1/mepe-text-emotion"
     )
@@ -42,20 +43,12 @@ def load_models():
     )
     text_encoder.trainable = False
 
-    # ---------- FACE MODEL (THE REAL FIX) ----------
-    custom_objects = {
-        # These names must MATCH what Keras serialized
-        "GetItem": Lambda,
-        "Stack": Lambda,
-    }
-
-    face_model = tf.keras.models.load_model(
-        "models/face_emotion/model.keras",
-        compile=False,
-        custom_objects=custom_objects
+    # ✅ FACE MODEL (ARCH + WEIGHTS)
+    face_model = build_face_model(num_classes=7)
+    face_model.load_weights(
+        "models/face_emotion/model.weights.h5"
     )
 
-    # ---------- LLM ----------
     llm = pipeline(
         "text2text-generation",
         model="google/flan-t5-base",
@@ -63,6 +56,7 @@ def load_models():
     )
 
     return tokenizer, text_encoder, face_model, llm
+
 
 
 tokenizer, text_encoder, face_model, llm = load_models()
