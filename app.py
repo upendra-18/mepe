@@ -36,7 +36,7 @@ def load_models():
 
     # ---------- FACE MODEL (LOCAL / GITHUB) ----------
     face_model = tf.keras.models.load_model(
-        "face_emotion/model.keras",
+        "models/face_emotion/model.keras",
         compile=False
     )
 

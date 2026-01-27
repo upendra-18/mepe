@@ -25,7 +25,6 @@ logs/
 
 models/
 *.h5
-*.keras
 
 # OS
 .DS_Store
