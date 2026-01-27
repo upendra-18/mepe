@@ -1,5 +1,5 @@
 # ================================
-# MEPE Streamlit App (FINAL)
+# MEPE Streamlit App (FINAL – STABLE)
 # ================================
 
 import os
@@ -8,20 +8,28 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import streamlit as st
 import numpy as np
 from PIL import Image
-import json
-
 import tensorflow as tf
-from tensorflow.keras.layers import Lambda
-from transformers import AutoTokenizer, TFDistilBertModel, pipeline
+
+from transformers import (
+    AutoTokenizer,
+    TFDistilBertModel,
+    pipeline
+)
+
+from huggingface_hub import hf_hub_download
 
 # -------------------------------
 # Streamlit config
 # -------------------------------
-st.set_page_config(page_title="MEPE Demo", layout="centered")
+st.set_page_config(
+    page_title="MEPE – Multimodal Emotion Persona Engine",
+    layout="centered"
+)
+
 st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 
 # -------------------------------
-# Load models (cached)
+# Load models (cached, SAFE)
 # -------------------------------
 @st.cache_resource
 def load_models():
@@ -35,18 +43,19 @@ def load_models():
     )
     text_encoder.trainable = False
 
-    # ---------- FACE MODEL (REAL FIX) ----------
-    face_model = tf.keras.models.load_model(
-        "models/face_emotion/model.keras",
-        compile=False,
-        custom_objects={
-            "Lambda": Lambda,
-            "tf": tf
-        }
+    # ---------- FACE MODEL (SavedModel from HF) ----------
+    saved_model_pb = hf_hub_download(
+        repo_id="upendrareddy1/face-emotion-savedmodel",
+        filename="saved_model.pb",
+        repo_type="model"
     )
 
-    with open("models/face_emotion/classes.json", "r") as f:
-        face_classes = json.load(f)
+    face_model_dir = os.path.dirname(saved_model_pb)
+
+    face_model = tf.keras.models.load_model(
+        face_model_dir,
+        compile=False
+    )
 
     # ---------- LLM ----------
     llm = pipeline(
@@ -55,10 +64,10 @@ def load_models():
         device=-1
     )
 
-    return tokenizer, text_encoder, face_model, face_classes, llm
+    return tokenizer, text_encoder, face_model, llm
 
 
-tokenizer, text_encoder, face_model, face_classes, llm = load_models()
+tokenizer, text_encoder, face_model, llm = load_models()
 
 # -------------------------------
 # Inference helpers
@@ -115,6 +124,7 @@ User message:
 Response:
 """.strip()
 
+
 # -------------------------------
 # UI
 # -------------------------------
@@ -129,12 +139,15 @@ if st.button("Analyze & Respond"):
 
         t_emb = text_embedding(user_text)
         f_emb = face_embedding(img)
-        _ = gated_fusion(t_emb, f_emb)
+        _ = gated_fusion(t_emb, f_emb)  # demo fusion
 
         persona = persona_control()
         prompt = build_prompt(user_text, persona)
 
-        response = llm(prompt, max_new_tokens=200)[0]["generated_text"]
+        response = llm(
+            prompt,
+            max_new_tokens=200
+        )[0]["generated_text"]
 
         st.subheader("Detected Persona")
         st.json(persona)
