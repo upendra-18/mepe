@@ -11,6 +11,7 @@ from PIL import Image
 
 import tensorflow as tf
 from transformers import AutoTokenizer, TFDistilBertModel, pipeline
+from huggingface_hub import hf_hub_download
 
 # -------------------------------
 # Streamlit config
@@ -23,8 +24,6 @@ st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 # -------------------------------
 @st.cache_resource
 def load_models():
-    from huggingface_hub import hf_hub_download
-
     # ---------- TEXT MODEL ----------
     tokenizer = AutoTokenizer.from_pretrained(
         "upendrareddy1/mepe-text-emotion"
@@ -35,16 +34,16 @@ def load_models():
     )
     text_encoder.trainable = False
 
-    # ---------- FACE MODEL (FIXED) ----------
+    # ---------- FACE MODEL ----------
     face_model_path = hf_hub_download(
         repo_id="upendrareddy1/face-emotion-keras",
         filename="model.keras"
     )
 
-    # 🔧 FIX: use tf.keras, NOT keras
     face_model = tf.keras.models.load_model(
         face_model_path,
-        compile=False
+        compile=False,
+        safe_mode=False
     )
 
     # ---------- LLM ----------
@@ -128,7 +127,7 @@ if st.button("Analyze & Respond"):
 
         t_emb = text_embedding(user_text)
         f_emb = face_embedding(img)
-        fused = gated_fusion(t_emb, f_emb)
+        _ = gated_fusion(t_emb, f_emb)  # fused embedding (reserved for future use)
 
         persona = persona_control()
         prompt = build_prompt(user_text, persona)
