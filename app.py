@@ -1,5 +1,5 @@
 # ================================
-# MEPE Streamlit App (FINAL – ACTUALLY STABLE)
+# MEPE Streamlit App (FINAL – ACTUALLY FINAL)
 # ================================
 
 import os
@@ -16,9 +16,7 @@ from transformers import (
     pipeline
 )
 
-# 🔑 IMPORT THESE — THIS IS THE FIX
-from keras.layers import GetItem
-from keras.ops import stack
+from tensorflow.keras.layers import Lambda
 
 # -------------------------------
 # Streamlit config
@@ -27,11 +25,10 @@ st.set_page_config(
     page_title="MEPE – Multimodal Emotion Persona Engine",
     layout="centered"
 )
-
 st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 
 # -------------------------------
-# Load models (CACHED, FIXED)
+# Load models (CACHED, STABLE)
 # -------------------------------
 @st.cache_resource
 def load_models():
@@ -47,8 +44,9 @@ def load_models():
 
     # ---------- FACE MODEL (THE REAL FIX) ----------
     custom_objects = {
-        "GetItem": GetItem,
-        "Stack": stack,
+        # These names must MATCH what Keras serialized
+        "GetItem": Lambda,
+        "Stack": Lambda,
     }
 
     face_model = tf.keras.models.load_model(
