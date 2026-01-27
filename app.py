@@ -8,10 +8,10 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import streamlit as st
 import numpy as np
 from PIL import Image
+import json
 
 import tensorflow as tf
 from transformers import AutoTokenizer, TFDistilBertModel, pipeline
-import json
 
 # -------------------------------
 # Streamlit config
@@ -24,7 +24,7 @@ st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 # -------------------------------
 @st.cache_resource
 def load_models():
-    # ---------- TEXT MODEL (HF) ----------
+    # ---------- TEXT MODEL ----------
     tokenizer = AutoTokenizer.from_pretrained(
         "upendrareddy1/mepe-text-emotion"
     )
@@ -40,7 +40,7 @@ def load_models():
         compile=False
     )
 
-    with open("face_emotion/classes.json", "r") as f:
+    with open("models/face_emotion/classes.json", "r") as f:
         face_classes = json.load(f)
 
     # ---------- LLM ----------
@@ -53,6 +53,7 @@ def load_models():
     return tokenizer, text_encoder, face_model, face_classes, llm
 
 
+# ✅ CORRECT unpacking (5 values)
 tokenizer, text_encoder, face_model, face_classes, llm = load_models()
 
 # -------------------------------
