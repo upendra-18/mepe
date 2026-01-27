@@ -1,6 +1,5 @@
 # ================================
 # MEPE Streamlit App (FINAL)
-# Keras 3 + TF 2.16 (CPU)
 # ================================
 
 import os
@@ -10,34 +9,32 @@ import streamlit as st
 import numpy as np
 from PIL import Image
 
-import keras
 import tensorflow as tf
+import keras
 from transformers import AutoTokenizer, TFDistilBertModel, pipeline
-
 
 # -------------------------------
 # Streamlit config
 # -------------------------------
 st.set_page_config(page_title="MEPE Demo", layout="centered")
-# st.title("🧠 Multimodal Emotion Persona Engine (MEPE)")
-st.title("MEPE"
-"")
+st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 
 # -------------------------------
 # Load models (cached)
 # -------------------------------
 @st.cache_resource
-@st.cache_resource
 def load_models():
-    tokenizer = AutoTokenizer.from_pretrained("models/text_emotion_hf")
+    tokenizer = AutoTokenizer.from_pretrained(
+        "upendrareddy1/mepe-text-emotion"
+    )
 
     text_encoder = TFDistilBertModel.from_pretrained(
-        "models/text_emotion_hf",
+        "upendrareddy1/mepe-text-emotion"
     )
     text_encoder.trainable = False
 
     face_model = keras.models.load_model(
-        "models/face_emotion/model.keras",
+        "https://huggingface.co/upendra/face-emotion-keras/resolve/main/model.keras",
         compile=False
     )
 
@@ -50,20 +47,22 @@ def load_models():
     return tokenizer, text_encoder, face_model, llm
 
 
-
 tokenizer, text_encoder, face_model, llm = load_models()
-
 
 # -------------------------------
 # Inference helpers
 # -------------------------------
 def text_embedding(text: str) -> np.ndarray:
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
-    with torch.no_grad():
-        outputs = text_encoder(**inputs)
-    emb = outputs.last_hidden_state.mean(dim=1)
-    return emb.cpu().numpy()[0]
-
+    tokens = tokenizer(
+        text,
+        return_tensors="tf",
+        truncation=True,
+        padding=True,
+        max_length=128
+    )
+    outputs = text_encoder(**tokens)
+    emb = tf.reduce_mean(outputs.last_hidden_state, axis=1)
+    return emb.numpy()[0]
 
 
 def face_embedding(img: Image.Image) -> np.ndarray:
@@ -79,7 +78,6 @@ def gated_fusion(t: np.ndarray, f: np.ndarray) -> np.ndarray:
 
 
 def persona_control():
-    # Minimal deterministic policy (demo-safe)
     return {
         "stress": "medium",
         "empathy": "medium",
@@ -105,7 +103,6 @@ User message:
 
 Response:
 """.strip()
-
 
 # -------------------------------
 # UI
