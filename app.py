@@ -11,7 +11,7 @@ from PIL import Image
 
 import tensorflow as tf
 from transformers import AutoTokenizer, TFDistilBertModel, pipeline
-from huggingface_hub import hf_hub_download
+import json
 
 # -------------------------------
 # Streamlit config
@@ -24,7 +24,7 @@ st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 # -------------------------------
 @st.cache_resource
 def load_models():
-    # ---------- TEXT MODEL ----------
+    # ---------- TEXT MODEL (HF) ----------
     tokenizer = AutoTokenizer.from_pretrained(
         "upendrareddy1/mepe-text-emotion"
     )
@@ -34,19 +34,14 @@ def load_models():
     )
     text_encoder.trainable = False
 
-    # ---------- FACE MODEL (FINAL FIX) ----------
-    face_model_path = hf_hub_download(
-        repo_id="upendrareddy1/face-emotion-keras",
-        filename="model.keras"
+    # ---------- FACE MODEL (LOCAL / GITHUB) ----------
+    face_model = tf.keras.models.load_model(
+        "face_emotion/model.keras",
+        compile=False
     )
 
-    # 🔥 THIS IS THE REAL FIX
-    face_model = tf.keras.models.load_model(
-        face_model_path,
-        compile=False,
-        safe_mode=False,
-        custom_objects={"tf": tf}
-    )
+    with open("face_emotion/classes.json", "r") as f:
+        face_classes = json.load(f)
 
     # ---------- LLM ----------
     llm = pipeline(
@@ -55,10 +50,10 @@ def load_models():
         device=-1
     )
 
-    return tokenizer, text_encoder, face_model, llm
+    return tokenizer, text_encoder, face_model, face_classes, llm
 
 
-tokenizer, text_encoder, face_model, llm = load_models()
+tokenizer, text_encoder, face_model, face_classes, llm = load_models()
 
 # -------------------------------
 # Inference helpers
