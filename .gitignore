@@ -17,7 +17,6 @@ hf_cache/
 
 # TensorFlow / Keras
 logs/
-*.h5
 *.ckpt
 *.pb
 *.index

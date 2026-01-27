@@ -1,5 +1,5 @@
 # ================================
-# MEPE Streamlit App (FINAL – STABLE)
+# MEPE Streamlit App (FINAL – DEPLOYMENT SAFE)
 # ================================
 
 import os
@@ -27,10 +27,21 @@ st.set_page_config(
 st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 
 # -------------------------------
-# Load models (CACHED, SAFE)
+# Face model loader (PORTABLE)
+# -------------------------------
+def load_face_model():
+    with open("models/face_emotion/model.json", "r") as f:
+        model = tf.keras.models.model_from_json(f.read())
+
+    model.load_weights("models/face_emotion/model.weights.h5")
+    return model
+
+# -------------------------------
+# Load models (cached)
 # -------------------------------
 @st.cache_resource
 def load_models():
+    # ---- TEXT MODEL ----
     tokenizer = AutoTokenizer.from_pretrained(
         "upendrareddy1/mepe-text-emotion"
     )
@@ -40,13 +51,10 @@ def load_models():
     )
     text_encoder.trainable = False
 
-    # ✅ LOCAL MODEL FROM GITHUB (FINAL)
-    face_model = tf.keras.models.load_model(
-        "models/face_emotion/model.keras",
-        compile=False,
-        safe_mode=False
-    )
+    # ---- FACE MODEL (SAFE) ----
+    face_model = load_face_model()
 
+    # ---- LLM ----
     llm = pipeline(
         "text2text-generation",
         model="google/flan-t5-base",
@@ -54,7 +62,6 @@ def load_models():
     )
 
     return tokenizer, text_encoder, face_model, llm
-
 
 
 tokenizer, text_encoder, face_model, llm = load_models()
@@ -113,7 +120,6 @@ User message:
 
 Response:
 """.strip()
-
 
 # -------------------------------
 # UI
