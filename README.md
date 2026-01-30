@@ -40,11 +40,17 @@ The following diagram illustrates the end-to-end flow of the Multimodal Emotion 
 Project Structure
 mepe/
 ├── phase1_text_emotion/        # Text emotion classification (Transformer)
+
 ├── phase2_face_emotion/        # Facial emotion recognition (CNN)
+
 ├── phase3_inference/           # Independent inference pipelines
+
 ├── phase4_fusion/              # Multimodal fusion (gated attention)
+
 ├── phase5_persona_llm/
+
 │   └── phase5_persona_llm.ipynb  # 5A + 5B + 5C (design → control → demo)
+
 └── README.md
 
 Note: Phase 5 (Design, Persona Control, and Demo) is intentionally implemented in a single notebook to preserve end-to-end reasoning and reproducibility.
