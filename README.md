@@ -1,4 +1,3 @@
-
 # Multimodal Emotion Persona Engine (MEPE)
 
 MEPE is an end-to-end multimodal AI system that understands a user’s emotional state and communication persona from text and facial expressions, fuses these signals into a unified representation, and generates emotion-aware, persona-aligned responses using a large language model.
@@ -36,8 +35,7 @@ System Architecture Overview
 
 The following diagram illustrates the end-to-end flow of the Multimodal Emotion Persona Engine (MEPE), from raw inputs to persona-aware response generation.
 
-![MEPE Architecture Diagram](assets/mepe_architecture.png)
-
+![MEPE Architecture Diagram](assets/architecture.png)
 
 Project Structure
 mepe/
@@ -48,7 +46,6 @@ mepe/
 ├── phase5_persona_llm/
 │   └── phase5_persona_llm.ipynb  # 5A + 5B + 5C (design → control → demo)
 └── README.md
-
 
 Note: Phase 5 (Design, Persona Control, and Demo) is intentionally implemented in a single notebook to preserve end-to-end reasoning and reproducibility.
 

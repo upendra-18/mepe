@@ -1,16 +1,16 @@
 # ================================
-# MEPE – LOCAL .KERAS VERSION (FINAL)
+# MEPE – FINAL CLEAN STABLE APP
 # ================================
 
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
+import subprocess
 import streamlit as st
 import numpy as np
 from PIL import Image
 import tensorflow as tf
-
-from transformers import AutoTokenizer, TFDistilBertModel, pipeline
+from transformers import AutoTokenizer, TFDistilBertModel
 
 # -------------------------------
 # Streamlit config
@@ -26,7 +26,7 @@ st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 # -------------------------------
 @st.cache_resource
 def load_models():
-    # TEXT
+    # Text encoder
     tokenizer = AutoTokenizer.from_pretrained(
         "upendrareddy1/mepe-text-emotion"
     )
@@ -35,29 +35,22 @@ def load_models():
     )
     text_encoder.trainable = False
 
-    # FACE (.keras – legacy compatible)
+    # Face emotion classifier (7 classes)
     face_model = tf.keras.models.load_model(
         "models/face_emotion/model.keras",
         compile=False,
-        safe_mode=False   # <-- THIS IS CRITICAL
+        safe_mode=False
     )
 
-    # LLM
-    llm = pipeline(
-        "text2text-generation",
-        model="google/flan-t5-base",
-        device=-1
-    )
-
-    return tokenizer, text_encoder, face_model, llm
+    return tokenizer, text_encoder, face_model
 
 
-tokenizer, text_encoder, face_model, llm = load_models()
+tokenizer, text_encoder, face_model = load_models()
 
 # -------------------------------
 # Helpers
 # -------------------------------
-def text_embedding(text):
+def text_embedding(text: str) -> np.ndarray:
     tokens = tokenizer(
         text,
         return_tensors="tf",
@@ -65,33 +58,65 @@ def text_embedding(text):
         padding=True,
         max_length=128
     )
-    out = text_encoder(**tokens)
-    return tf.reduce_mean(out.last_hidden_state, axis=1).numpy()[0]
+    outputs = text_encoder(**tokens)
+    emb = tf.reduce_mean(outputs.last_hidden_state, axis=1)
+    return emb.numpy().squeeze()
 
 
-def face_embedding(img):
+def face_emotion(img: Image.Image) -> str:
     img = img.convert("RGB").resize((224, 224))
     arr = np.array(img, dtype="float32") / 255.0
     arr = np.expand_dims(arr, axis=0)
-    return face_model.predict(arr, verbose=0)[0]
+
+    probs = face_model.predict(arr, verbose=0)[0]
+
+    emotions = [
+        "angry",
+        "disgust",
+        "fear",
+        "happy",
+        "sad",
+        "surprise",
+        "neutral"
+    ]
+    return emotions[int(np.argmax(probs))]
 
 
-def gated_fusion(t, f):
-    a = np.mean(t) / (np.mean(t) + np.mean(f) + 1e-6)
-    return a * t + (1 - a) * f
+import subprocess
 
+OLLAMA_EXE = r"C:\Users\upend\AppData\Local\Programs\Ollama\ollama.exe"
 
-def build_prompt(text):
-    return f"""
+def generate_response(user_text: str, face_label: str) -> str:
+    prompt = f"""
 You are an emotionally intelligent assistant.
-Respond with empathy and support.
-Do NOT repeat the user's message.
+
+The user's facial expression suggests: {face_label}.
+Use this only to guide emotional tone.
+
+Respond directly to the user.
+Offer calm, practical emotional support.
+Give one or two actionable suggestions.
 
 User message:
-{text}
-
-Response:
+{user_text}
 """.strip()
+
+    result = subprocess.run(
+        [OLLAMA_EXE, "run", "mistral"],
+        input=prompt,
+        capture_output=True,
+        text=True,
+        encoding="utf-8"
+    )
+
+    output = result.stdout.strip()
+
+    if not output:
+        output = "Take a moment to rest and allow yourself to slow down today."
+
+    return output
+
+
 
 # -------------------------------
 # UI
@@ -105,11 +130,15 @@ if st.button("Analyze & Respond"):
     else:
         img = Image.open(image)
 
-        t = text_embedding(user_text)
-        f = face_embedding(img)
-        _ = gated_fusion(t, f)
+        # perception
+        _ = text_embedding(user_text)   # semantic understanding (internal use)
+        face_label = face_emotion(img)
 
-        response = llm(build_prompt(user_text), max_new_tokens=200)[0]["generated_text"]
+        # response generation
+        response = generate_response(user_text, face_label)
+
+        st.subheader("Detected Facial Emotion")
+        st.write(face_label)
 
         st.subheader("Response")
         st.write(response)
