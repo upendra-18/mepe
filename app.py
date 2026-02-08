@@ -1,93 +1,93 @@
-import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
 import streamlit as st
-import numpy as np
+import requests
+import time
+import base64
+import io
 from PIL import Image
-import tensorflow as tf
-from transformers import AutoTokenizer, TFDistilBertModel
 
 # ================================
-# STREAMLIT CONFIG
+# CONFIG
 # ================================
+TEXT_SPACE = "https://upendrareddy1-mepe-text-emotion-api.hf.space"
+FACE_SPACE = "https://upendrareddy1-mepe-face-emotion-api.hf.space"
+
 st.set_page_config(page_title="MEPE", layout="centered")
 st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 
 # ================================
-# LOAD MODELS (ONCE)
+# GRADIO QUEUE CALL (CORRECT WAY)
 # ================================
-@st.cache_resource
-def load_models():
-    tokenizer = AutoTokenizer.from_pretrained(
-        "upendrareddy1/mepe-text-emotion"
+def gradio_predict(space_url, data, timeout=30):
+    # Step 1: submit job
+    r = requests.post(
+        f"{space_url}/gradio_api/call/predict",
+        json={"data": data},
+        timeout=timeout
     )
-    text_encoder = TFDistilBertModel.from_pretrained(
-        "upendrareddy1/mepe-text-emotion"
-    )
-    text_encoder.trainable = False
+    r.raise_for_status()
+    event_id = r.json()["event_id"]
 
-    face_model = tf.keras.models.load_model(
-        "models/face_emotion/model.keras",
-        compile=False
-    )
+    # Step 2: poll result
+    start = time.time()
+    while True:
+        if time.time() - start > timeout:
+            raise RuntimeError("Gradio call timed out")
 
-    return tokenizer, text_encoder, face_model
+        r = requests.get(
+            f"{space_url}/gradio_api/call/predict/{event_id}",
+            timeout=timeout
+        )
 
-tokenizer, text_encoder, face_model = load_models()
+        for line in r.text.splitlines():
+            if line.startswith("data:"):
+                payload = line.replace("data:", "").strip()
+                if payload and payload != "null":
+                    return eval(payload)  # gradio returns python-like list
 
-# ================================
-# TEXT EMOTION
-# ================================
-def text_emotion(text):
-    tokens = tokenizer(
-        text,
-        return_tensors="tf",
-        truncation=True,
-        padding=True,
-        max_length=128
-    )
-    outputs = text_encoder(**tokens)
-    emb = tf.reduce_mean(outputs.last_hidden_state, axis=1)
-    return "neutral"  # replace with classifier if needed
+        time.sleep(0.5)
 
 # ================================
-# FACE EMOTION
+# MODEL CALLS
 # ================================
-def face_emotion(img):
-    img = img.resize((224, 224))
-    arr = np.array(img) / 255.0
-    arr = np.expand_dims(arr, axis=0)
-    preds = face_model.predict(arr, verbose=0)[0]
+def predict_text_emotion(text):
+    result = gradio_predict(TEXT_SPACE, [text])
+    return result[0][0]   # label
 
-    emotions = ["angry","disgust","fear","happy","sad","surprise","neutral"]
-    return emotions[int(np.argmax(preds))]
+def predict_face_emotion(img):
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    result = gradio_predict(FACE_SPACE, [f"data:image/jpeg;base64,{b64}"])
+    return result[0][0]   # label
 
-# ================================
-# MEPE LOGIC
-# ================================
-def resolve(text_e, face_e):
-    return text_e if text_e != "neutral" else face_e
+def resolve_final_emotion(text_e, face_e):
+    if text_e == face_e:
+        return text_e
+    return text_e  # text has priority (as you defined earlier)
 
-def generate_response(text, emotion):
-    return f"I sense **{emotion}**. Talk to me about what's on your mind."
+def generate_response(user_text, emotion):
+    return f"I sense **{emotion}**. Take a moment, breathe, and focus on one small thing you can control right now."
 
 # ================================
 # UI
 # ================================
 user_text = st.text_area("How are you feeling?")
-image = st.camera_input("Capture your face")
+image = st.camera_input("Capture your facial expression")
 
-if st.button("Analyze") and user_text and image:
-    img = Image.open(image)
+if st.button("Analyze & Respond"):
+    if not user_text or image is None:
+        st.warning("Text and face input required")
+    else:
+        img = Image.open(image)
 
-    with st.spinner("Understanding you..."):
-        te = text_emotion(user_text)
-        fe = face_emotion(img)
-        final = resolve(te, fe)
-        reply = generate_response(user_text, final)
+        with st.spinner("Understanding you..."):
+            text_e = predict_text_emotion(user_text)
+            face_e = predict_face_emotion(img)
+            final_e = resolve_final_emotion(text_e, face_e)
+            response = generate_response(user_text, final_e)
 
-    st.subheader("🧭 Emotion")
-    st.write(final)
+        st.subheader("🧭 Inferred Emotional State")
+        st.write(final_e)
 
-    st.subheader("💬 Response")
-    st.write(reply)
+        st.subheader("💬 MEPE Response")
+        st.write(response)
