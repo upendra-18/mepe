@@ -29,42 +29,47 @@ import requests
 import time
 import json
 
-def gradio_predict(space_url: str, data: list):
-    # 1. Submit job
+def gradio_predict(space_url: str, data: list, timeout=90):
+    start = time.time()
+
+    # Submit job
     r = requests.post(
         f"{space_url}/gradio_api/call/predict",
         json={"data": data},
-        timeout=60
+        timeout=30
     )
     r.raise_for_status()
     event_id = r.json()["event_id"]
 
-    # 2. Poll SSE stream
+    # Poll SSE
     while True:
-        time.sleep(0.6)
+        if time.time() - start > timeout:
+            raise TimeoutError("Gradio inference timed out")
 
         r = requests.get(
             f"{space_url}/gradio_api/call/predict/{event_id}",
             stream=True,
-            timeout=60
+            timeout=30
         )
         r.raise_for_status()
 
         for line in r.iter_lines(decode_unicode=True):
-            if not line:
+            if not line or not line.startswith("data:"):
                 continue
 
-            # Gradio sends:  data: [...]
-            if line.startswith("data:"):
-                payload = line.replace("data:", "").strip()
+            payload = line.replace("data:", "").strip()
 
-                # 🔒 CRITICAL: parse JSON safely
-                result = json.loads(payload)
+            if payload == "null":
+                continue
 
-                if result is None:
-                    continue
+            result = json.loads(payload)
 
+            # ✅ EXIT CONDITION
+            if isinstance(result, list):
                 return result
+
+        time.sleep(0.4)
+
 
 
 
