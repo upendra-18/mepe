@@ -25,8 +25,12 @@ FACE_SPACE = "https://upendrareddy1-mepe-face-emotion-api.hf.space"
 # -------------------------------
 # GRADIO SPACE CALL (CORRECT)
 # -------------------------------
+import requests
+import time
+import json
+
 def gradio_predict(space_url: str, data: list):
-    # Step 1: submit job
+    # 1. Submit job
     r = requests.post(
         f"{space_url}/gradio_api/call/predict",
         json={"data": data},
@@ -35,9 +39,10 @@ def gradio_predict(space_url: str, data: list):
     r.raise_for_status()
     event_id = r.json()["event_id"]
 
-    # Step 2: poll SSE stream
+    # 2. Poll SSE stream
     while True:
-        time.sleep(0.7)
+        time.sleep(0.6)
+
         r = requests.get(
             f"{space_url}/gradio_api/call/predict/{event_id}",
             stream=True,
@@ -49,10 +54,18 @@ def gradio_predict(space_url: str, data: list):
             if not line:
                 continue
 
-            # ✅ THIS IS THE KEY LINE
+            # Gradio sends:  data: [...]
             if line.startswith("data:"):
                 payload = line.replace("data:", "").strip()
-                return json.loads(payload)
+
+                # 🔒 CRITICAL: parse JSON safely
+                result = json.loads(payload)
+
+                if result is None:
+                    continue
+
+                return result
+
 
 
 # -------------------------------
