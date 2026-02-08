@@ -13,7 +13,7 @@ import base64
 # -------------------------------
 # CONFIG
 # -------------------------------
-HF_TOKEN = st.secrets["HF_TOKEN"]
+HF_TOKEN = st.secrets.get("HF_TOKEN",None)
 
 TEXT_EMOTION_MODEL = "upendrareddy1/mepe-text-emotion-api"
 FACE_EMOTION_MODEL = "upendrareddy1/mepe-face-emotion-api"
