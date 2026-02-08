@@ -36,15 +36,21 @@ st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 # API CALLS
 # -------------------------------
 def predict_text_emotion(text: str) -> str:
-    payload = {"inputs": text}
+    payload = {
+        "data": [text]
+    }
+
     r = requests.post(
-        f"https://api-inference.huggingface.co/models/{TEXT_EMOTION_MODEL}",
-        headers=HEADERS,
+        "https://upendrareddy1-mepe-text-emotion-api.hf.space/run/predict",
         json=payload,
         timeout=60
     )
+
     r.raise_for_status()
-    return r.json()[0]["label"]
+
+    # Gradio returns: {"data": [[label, score]]}
+    return r.json()["data"][0][0]
+
 
 
 def predict_face_emotion(img: Image.Image) -> str:
