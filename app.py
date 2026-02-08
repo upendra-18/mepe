@@ -8,6 +8,7 @@ import base64
 import time
 from PIL import Image
 import numpy as np
+import json
 
 # -------------------------------
 # CONFIG
@@ -34,20 +35,25 @@ def gradio_predict(space_url: str, data: list):
     r.raise_for_status()
     event_id = r.json()["event_id"]
 
-    # Step 2: poll result
+    # Step 2: poll SSE stream
     while True:
-        time.sleep(0.8)
+        time.sleep(0.7)
         r = requests.get(
             f"{space_url}/gradio_api/call/predict/{event_id}",
+            stream=True,
             timeout=60
         )
-        if r.status_code != 200:
-            continue
+        r.raise_for_status()
 
-        text = r.text
-        if "data:" in text:
-            result = text.split("data:")[-1].strip()
-            return eval(result)  # Gradio returns Python-like list
+        for line in r.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+
+            # ✅ THIS IS THE KEY LINE
+            if line.startswith("data:"):
+                payload = line.replace("data:", "").strip()
+                return json.loads(payload)
+
 
 # -------------------------------
 # MODEL CALLS
