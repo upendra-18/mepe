@@ -1,6 +1,7 @@
 streamlit==1.54.0
-tensorflow==2.16.1
-keras==3.0.5
-transformers==4.40.0
+torch
+torchvision
+transformers
 numpy
 pillow
+
