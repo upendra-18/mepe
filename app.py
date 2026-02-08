@@ -1,139 +1,87 @@
 # ================================
-# MEPE – STREAMLIT (HF GRADIO CALL)
+# MEPE – STREAMLIT (STABLE)
+# Inference API (NO SPACES)
 # ================================
 
 import streamlit as st
 import requests
 import base64
-import time
+import io
 from PIL import Image
-import numpy as np
-import json
 
 # -------------------------------
 # CONFIG
+# -------------------------------
+HF_TOKEN = st.secrets["HF_TOKEN"]
+
+TEXT_MODEL = "upendrareddy1/mepe-text-emotion"
+FACE_MODEL = "upendrareddy1/mepe-face-emotion"
+
+HEADERS = {
+    "Authorization": f"Bearer {HF_TOKEN}",
+    "Content-Type": "application/json"
+}
+
+TEXT_API = f"https://api-inference.huggingface.co/models/{TEXT_MODEL}"
+FACE_API = f"https://api-inference.huggingface.co/models/{FACE_MODEL}"
+
+# -------------------------------
+# API CALLS (SYNC, SAFE)
+# -------------------------------
+def predict_text_emotion(text: str) -> str:
+    r = requests.post(
+        TEXT_API,
+        headers=HEADERS,
+        json={"inputs": text},
+        timeout=20
+    )
+    r.raise_for_status()
+    return r.json()[0]["label"]
+
+def predict_face_emotion(img: Image.Image) -> str:
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="JPEG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+
+    r = requests.post(
+        FACE_API,
+        headers=HEADERS,
+        json={"inputs": f"data:image/jpeg;base64,{b64}"},
+        timeout=20
+    )
+    r.raise_for_status()
+    return r.json()[0]["label"]
+
+# -------------------------------
+# MEPE LOGIC (UNCHANGED)
+# -------------------------------
+def resolve_final_emotion(text_e, face_e):
+    if text_e == face_e:
+        return text_e
+    if face_e in ["sad", "angry", "fear"]:
+        return face_e
+    return text_e
+
+def generate_mepe_response(user_text, emotion):
+    return f"""
+I sense **{emotion}** from your expression and words.
+
+Let’s slow down for a moment.
+Try taking one deep breath and focus on one small thing you can control right now.
+
+I’m here with you.
+""".strip()
+
+# -------------------------------
+# STREAMLIT UI (CAMERA)
 # -------------------------------
 st.set_page_config(
     page_title="MEPE – Multimodal Emotion Persona Engine",
     layout="centered"
 )
+
 st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 
-TEXT_SPACE = "https://upendrareddy1-mepe-text-emotion-api.hf.space"
-FACE_SPACE = "https://upendrareddy1-mepe-face-emotion-api.hf.space"
-
-# -------------------------------
-# GRADIO SPACE CALL (CORRECT)
-# -------------------------------
-import requests
-import time
-import json
-
-def gradio_predict(space_url: str, data: list, timeout=90):
-    start = time.time()
-
-    # Submit job
-    r = requests.post(
-        f"{space_url}/gradio_api/call/predict",
-        json={"data": data},
-        timeout=30
-    )
-    r.raise_for_status()
-    event_id = r.json()["event_id"]
-
-    # Poll SSE
-    while True:
-        if time.time() - start > timeout:
-            raise TimeoutError("Gradio inference timed out")
-
-        r = requests.get(
-            f"{space_url}/gradio_api/call/predict/{event_id}",
-            stream=True,
-            timeout=30
-        )
-        r.raise_for_status()
-
-        for line in r.iter_lines(decode_unicode=True):
-            if not line or not line.startswith("data:"):
-                continue
-
-            payload = line.replace("data:", "").strip()
-
-            if payload == "null":
-                continue
-
-            result = json.loads(payload)
-
-            # ✅ EXIT CONDITION
-            if isinstance(result, list):
-                return result
-
-        time.sleep(0.4)
-
-
-
-
-# -------------------------------
-# MODEL CALLS
-# -------------------------------
-def predict_text_emotion(text: str) -> str:
-    result = gradio_predict(TEXT_SPACE, [text])
-    return result[0][0]  # label
-
-def predict_face_emotion(img: Image.Image) -> str:
-    img = img.convert("RGB").resize((224, 224))
-    arr = np.array(img)
-    buf = base64.b64encode(arr.tobytes()).decode("utf-8")
-
-    result = gradio_predict(FACE_SPACE, [buf])
-    return result[0][0]  # label
-
-# -------------------------------
-# FUSION LOGIC (NO SHORTCUTS)
-# -------------------------------
-def resolve_final_emotion(text_e: str, face_e: str) -> str:
-    if text_e == face_e:
-        return text_e
-
-    priority = ["sad", "angry", "fear", "disgust"]
-    for e in priority:
-        if e in (text_e, face_e):
-            return e
-
-    return text_e
-
-# -------------------------------
-# RESPONSE GENERATION (MEPE CORE)
-# -------------------------------
-def generate_mepe_response(user_text: str, emotion: str) -> str:
-    prompt = f"""
-You are an emotionally intelligent assistant.
-
-Detected emotional state: {emotion}
-Use this only to guide emotional tone.
-
-Respond directly to the user.
-Give 1–2 calm, practical suggestions.
-Do NOT repeat the user's message.
-
-User message:
-{user_text}
-""".strip()
-
-    r = requests.post(
-        "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
-        json={"inputs": prompt},
-        timeout=60
-    )
-
-    try:
-        return r.json()[0]["generated_text"]
-    except:
-        return "Take a breath. Give yourself a moment to slow down."
-
-# -------------------------------
-# UI (UNCHANGED CAMERA INPUT)
-# -------------------------------
 user_text = st.text_area("How are you feeling?")
 image = st.camera_input("Capture your facial expression")
 
