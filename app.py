@@ -35,22 +35,37 @@ st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 # -------------------------------
 # API CALLS
 # -------------------------------
-def predict_text_emotion(text: str) -> str:
-    payload = {
-        "data": [text]
-    }
+import requests
+import time
 
+TEXT_API_BASE = "https://upendrareddy1-mepe-text-emotion-api.hf.space"
+
+def predict_text_emotion(text: str) -> str:
+    # 1️⃣ enqueue
     r = requests.post(
-        "https://upendrareddy1-mepe-text-emotion-api.hf.space/predict",
-        json=payload,
+        f"{TEXT_API_BASE}/gradio_api/call/predict",
+        json={"data": [text]},
         timeout=60
     )
-
     r.raise_for_status()
 
-    # Gradio response format
-    # {"data": [["happy", 0.91]]}
-    return r.json()["data"][0][0]
+    event_id = r.json()["event_id"]
+
+    # 2️⃣ poll
+    while True:
+        r = requests.get(
+            f"{TEXT_API_BASE}/gradio_api/call/predict/{event_id}",
+            timeout=60
+        )
+        r.raise_for_status()
+
+        result = r.json()
+        if result["status"] == "completed":
+            # Gradio returns: {"data": [["happy", 0.91]]}
+            return result["data"][0][0]
+
+        time.sleep(0.5)
+
 
 
 
