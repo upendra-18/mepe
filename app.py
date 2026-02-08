@@ -41,15 +41,18 @@ def predict_text_emotion(text: str) -> str:
     }
 
     r = requests.post(
-        "https://upendrareddy1-mepe-text-emotion-api.hf.space/run/predict",
+        "https://upendrareddy1-mepe-text-emotion-api.hf.space/predict",
         json=payload,
         timeout=60
     )
 
     r.raise_for_status()
 
-    # Gradio returns: {"data": [[label, score]]}
+    # Gradio response format
+    # {"data": [["happy", 0.91]]}
     return r.json()["data"][0][0]
+
+
 
 
 
