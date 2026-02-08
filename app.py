@@ -1,144 +1,118 @@
-# ================================
-# MEPE – FINAL CLEAN STABLE APP
-# ================================
-
-import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
-import subprocess
 import streamlit as st
+import requests
 import numpy as np
 from PIL import Image
-import tensorflow as tf
-from transformers import AutoTokenizer, TFDistilBertModel
+import io
 
-# -------------------------------
-# Streamlit config
-# -------------------------------
+# ==============================
+# CONFIG — UPDATE ONLY URLs
+# ==============================
+
+TEXT_EMOTION_API = (
+    "https://api-inference.huggingface.co/models/"
+    "upendrareddy1/mepe-text-emotion-api"
+)
+
+FACE_EMOTION_API = (
+    "https://api-inference.huggingface.co/models/"
+    "upendrareddy1/mepe-face-emotion-api"
+)
+
+CRITICAL_FACE_EMOTIONS = {"fear", "anger", "sad"}
+
+# ==============================
+# HELPERS — API CALLS
+# ==============================
+
+def call_text_emotion(input_ids, attention_mask):
+    payload = {
+        "inputs": {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask
+        }
+    }
+    r = requests.post(TEXT_EMOTION_API, json=payload, timeout=120)
+    r.raise_for_status()
+
+    # Expected: embedding or logits
+    return r.json()
+
+
+def call_face_emotion(image: Image.Image):
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    buf.seek(0)
+
+    r = requests.post(
+        FACE_EMOTION_API,
+        files={"file": buf},
+        timeout=120
+    )
+    r.raise_for_status()
+
+    # Expected: {"label": "..."} or logits
+    return r.json()
+
+
+def resolve_final_emotion(text_emotion: str, face_emotion: str) -> str:
+    # Rule 1: agreement
+    if text_emotion == face_emotion:
+        return text_emotion
+
+    # Rule 2: critical face override
+    if face_emotion in CRITICAL_FACE_EMOTIONS:
+        return face_emotion
+
+    # Rule 3: default to text
+    return text_emotion
+
+
+# ==============================
+# STREAMLIT UI
+# ==============================
+
 st.set_page_config(
-    page_title="MEPE – Multimodal Emotion Persona Engine",
+    page_title="MEPE – Multimodal Emotion Engine",
     layout="centered"
 )
-st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
 
-# -------------------------------
-# Load models (CACHED)
-# -------------------------------
-@st.cache_resource
-def load_models():
-    # Text encoder
-    tokenizer = AutoTokenizer.from_pretrained(
-        "upendrareddy1/mepe-text-emotion"
-    )
-    text_encoder = TFDistilBertModel.from_pretrained(
-        "upendrareddy1/mepe-text-emotion"
-    )
-    text_encoder.trainable = False
+st.title("🧠 MEPE – Multimodal Emotion Engine")
 
-    # Face emotion classifier (7 classes)
-    face_model = tf.keras.models.load_model(
-        "models/face_emotion/model.keras",
-        compile=False,
-        safe_mode=False
-    )
+st.markdown("### Inputs")
 
-    return tokenizer, text_encoder, face_model
+user_text = st.text_input("User text")
+image = st.camera_input("Capture facial expression")
 
-
-tokenizer, text_encoder, face_model = load_models()
-
-# -------------------------------
-# Helpers
-# -------------------------------
-def text_embedding(text: str) -> np.ndarray:
-    tokens = tokenizer(
-        text,
-        return_tensors="tf",
-        truncation=True,
-        padding=True,
-        max_length=128
-    )
-    outputs = text_encoder(**tokens)
-    emb = tf.reduce_mean(outputs.last_hidden_state, axis=1)
-    return emb.numpy().squeeze()
-
-
-def face_emotion(img: Image.Image) -> str:
-    img = img.convert("RGB").resize((224, 224))
-    arr = np.array(img, dtype="float32") / 255.0
-    arr = np.expand_dims(arr, axis=0)
-
-    probs = face_model.predict(arr, verbose=0)[0]
-
-    emotions = [
-        "angry",
-        "disgust",
-        "fear",
-        "happy",
-        "sad",
-        "surprise",
-        "neutral"
-    ]
-    return emotions[int(np.argmax(probs))]
-
-
-import subprocess
-
-OLLAMA_EXE = r"C:\Users\upend\AppData\Local\Programs\Ollama\ollama.exe"
-
-def generate_response(user_text: str, face_label: str) -> str:
-    prompt = f"""
-You are an emotionally intelligent assistant.
-
-The user's facial expression suggests: {face_label}.
-Use this only to guide emotional tone.
-
-Respond directly to the user.
-Offer calm, practical emotional support.
-Give one or two actionable suggestions.
-
-User message:
-{user_text}
-""".strip()
-
-    result = subprocess.run(
-        [OLLAMA_EXE, "run", "mistral"],
-        input=prompt,
-        capture_output=True,
-        text=True,
-        encoding="utf-8"
-    )
-
-    output = result.stdout.strip()
-
-    if not output:
-        output = "Take a moment to rest and allow yourself to slow down today."
-
-    return output
-
-
-
-# -------------------------------
-# UI
-# -------------------------------
-user_text = st.text_area("How are you feeling?")
-image = st.camera_input("Capture your facial expression")
-
-if st.button("Analyze & Respond"):
+if st.button("Analyze"):
     if not user_text or image is None:
-        st.warning("Both inputs are required.")
-    else:
-        img = Image.open(image)
+        st.warning("Both text and image are required.")
+        st.stop()
 
-        # perception
-        _ = text_embedding(user_text)   # semantic understanding (internal use)
-        face_label = face_emotion(img)
+    # ⚠️ TEMP tokens (replace with tokenizer later)
+    input_ids = [101, 1045, 2572, 1037, 2204, 2154, 102]
+    attention_mask = [1, 1, 1, 1, 1, 1, 1]
 
-        # response generation
-        response = generate_response(user_text, face_label)
+    with st.spinner("Running emotion analysis..."):
+        # ---- Text ----
+        text_result = call_text_emotion(input_ids, attention_mask)
 
-        st.subheader("Detected Facial Emotion")
-        st.write(face_label)
+        # TODO: map output → emotion label
+        # Placeholder until classifier is wired
+        text_emotion = "neutral"
 
-        st.subheader("Response")
-        st.write(response)
+        # ---- Face ----
+        face_result = call_face_emotion(Image.open(image))
+
+        # Expecting {"label": "..."}
+        face_emotion = face_result.get("label", "neutral")
+
+        # ---- Final decision ----
+        final_emotion = resolve_final_emotion(
+            text_emotion,
+            face_emotion
+        )
+
+    st.subheader("Results")
+    st.write("**Text Emotion:**", text_emotion)
+    st.write("**Face Emotion:**", face_emotion)
+    st.success(f"🎯 Final Emotion: {final_emotion}")
