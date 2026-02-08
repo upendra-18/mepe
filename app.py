@@ -1,104 +1,90 @@
-# ================================
-# MEPE – STREAMLIT (STABLE)
-# Inference API (NO SPACES)
-# ================================
-
 import streamlit as st
 import requests
+import time
 import base64
 import io
+import numpy as np
 from PIL import Image
 
-# -------------------------------
+# ================================
 # CONFIG
-# -------------------------------
-HF_TOKEN = st.secrets["HF_TOKEN"]
+# ================================
+TEXT_SPACE = "https://upendrareddy1-mepe-text-emotion-api.hf.space"
+FACE_SPACE = "https://upendrareddy1-mepe-face-emotion-api.hf.space"
 
-TEXT_MODEL = "upendrareddy1/mepe-text-emotion"
-FACE_MODEL = "upendrareddy1/mepe-face-emotion"
-
-HEADERS = {
-    "Authorization": f"Bearer {HF_TOKEN}",
-    "Content-Type": "application/json"
-}
-
-TEXT_API = f"https://api-inference.huggingface.co/models/{TEXT_MODEL}"
-FACE_API = f"https://api-inference.huggingface.co/models/{FACE_MODEL}"
-
-# -------------------------------
-# API CALLS (SYNC, SAFE)
-# -------------------------------
-def predict_text_emotion(text: str) -> str:
-    r = requests.post(
-        TEXT_API,
-        headers=HEADERS,
-        json={"inputs": text},
-        timeout=20
+# ================================
+# GRADIO SPACE CALL
+# ================================
+def gradio_predict(space_url, data):
+    submit = requests.post(
+        f"{space_url}/gradio_api/call/predict",
+        json={"data": data},
+        timeout=30
     )
-    r.raise_for_status()
-    return r.json()[0]["label"]
+    submit.raise_for_status()
+    event_id = submit.json()["event_id"]
 
-def predict_face_emotion(img: Image.Image) -> str:
+    while True:
+        poll = requests.get(
+            f"{space_url}/gradio_api/call/predict/{event_id}",
+            timeout=30
+        )
+        if poll.status_code != 200:
+            time.sleep(0.5)
+            continue
+
+        text = poll.text
+        if text.startswith("data:"):
+            return eval(text.replace("data:", "").strip())
+
+        time.sleep(0.5)
+
+# ================================
+# MODEL CALLS
+# ================================
+def predict_text_emotion(text):
+    result = gradio_predict(TEXT_SPACE, [text])
+    return result[0][0]
+
+def predict_face_emotion(img: Image.Image):
     buf = io.BytesIO()
-    img.convert("RGB").save(buf, format="JPEG")
+    img.save(buf, format="JPEG")
     b64 = base64.b64encode(buf.getvalue()).decode()
 
-    r = requests.post(
-        FACE_API,
-        headers=HEADERS,
-        json={"inputs": f"data:image/jpeg;base64,{b64}"},
-        timeout=20
-    )
-    r.raise_for_status()
-    return r.json()[0]["label"]
+    result = gradio_predict(FACE_SPACE, [f"data:image/jpeg;base64,{b64}"])
+    return result[0][0]
 
-# -------------------------------
-# MEPE LOGIC (UNCHANGED)
-# -------------------------------
+# ================================
+# MEPE LOGIC
+# ================================
 def resolve_final_emotion(text_e, face_e):
     if text_e == face_e:
         return text_e
-    if face_e in ["sad", "angry", "fear"]:
-        return face_e
-    return text_e
+    return text_e  # text has priority (intent > expression)
 
-def generate_mepe_response(user_text, emotion):
-    return f"""
-I sense **{emotion}** from your expression and words.
+def generate_mepe_response(text, emotion):
+    return f"I sense **{emotion}**. Tell me more about what you're feeling."
 
-Let’s slow down for a moment.
-Try taking one deep breath and focus on one small thing you can control right now.
+# ================================
+# STREAMLIT UI
+# ================================
+st.set_page_config(page_title="MEPE", layout="centered")
+st.title("🧠 MEPE — Emotion-Aware AI")
 
-I’m here with you.
-""".strip()
+user_text = st.text_area("Your message")
+image = st.camera_input("Capture your face")
 
-# -------------------------------
-# STREAMLIT UI (CAMERA)
-# -------------------------------
-st.set_page_config(
-    page_title="MEPE – Multimodal Emotion Persona Engine",
-    layout="centered"
-)
+if st.button("Analyze") and user_text and image:
+    img = Image.open(image)
 
-st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
+    with st.spinner("Understanding you..."):
+        text_e = predict_text_emotion(user_text)
+        face_e = predict_face_emotion(img)
+        final_e = resolve_final_emotion(text_e, face_e)
+        response = generate_mepe_response(user_text, final_e)
 
-user_text = st.text_area("How are you feeling?")
-image = st.camera_input("Capture your facial expression")
+    st.subheader("🧭 Emotion")
+    st.write(final_e)
 
-if st.button("Analyze & Respond"):
-    if not user_text or image is None:
-        st.warning("Both text and face input are required.")
-    else:
-        img = Image.open(image)
-
-        with st.spinner("Understanding you..."):
-            text_e = predict_text_emotion(user_text)
-            face_e = predict_face_emotion(img)
-            final_e = resolve_final_emotion(text_e, face_e)
-            response = generate_mepe_response(user_text, final_e)
-
-        st.subheader("🧭 Inferred Emotional State")
-        st.write(final_e)
-
-        st.subheader("💬 MEPE Response")
-        st.write(response)
+    st.subheader("💬 MEPE Response")
+    st.write(response)
