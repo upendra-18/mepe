@@ -1,143 +1,138 @@
 import streamlit as st
-from gradio_client import Client, handle_file
+import requests
+import numpy as np
+import base64
 from PIL import Image
-import tempfile
-import os
+import io
 
-# ================================
-# STREAMLIT CONFIG
-# ================================
-st.set_page_config(page_title="MEPE", layout="centered")
-st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
+# ===============================
+# CONFIG
+# ===============================
 
-# ================================
-# GRADIO CLIENTS
-# ================================
-text_client = Client("upendrareddy1/mepe-text-emotion-api")
-face_client = Client("upendrareddy1/mepe-face-emotion-api")
+TEXT_API = "https://upendrareddy1-mepe-text-emotion-api.hf.space/run/predict"
+FACE_API = "https://upendrareddy1-mepe-face-emotion-api.hf.space/run/predict"
 
-# ================================
-# TEXT EMOTION CALL
-# ================================
+TEXT_DIM = 768
+FACE_DIM = 256
+FUSION_DIM = 512
+
+REQUEST_TIMEOUT = 25  # seconds
+
+# ===============================
+# UTILS
+# ===============================
+
+def image_to_base64(img: Image.Image) -> str:
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    return base64.b64encode(buf.getvalue()).decode()
+
+def safe_post(url, payload):
+    r = requests.post(url, json=payload, timeout=REQUEST_TIMEOUT)
+    r.raise_for_status()
+    return r.json()
+
+# ===============================
+# HF SPACE CALLS
+# ===============================
+
 def predict_text_emotion(text: str):
-    """
-    Gradio contract:
-    /predict(input_ids, attention_mask)
+    payload = {"data": [text]}
+    res = safe_post(TEXT_API, payload)
 
-    Backend handles tokenization internally.
-    We only need to pass placeholders.
-    Output: [[label, confidence]]
+    # EXPECTED: [embedding, label]
+    embedding = np.array(res["data"][0], dtype=np.float32)
+    label = res["data"][1]
+
+    if embedding.shape[0] != TEXT_DIM:
+        raise ValueError("Text embedding dimension mismatch")
+
+    return embedding, label
+
+def predict_face_emotion(img: Image.Image):
+    b64 = image_to_base64(img)
+    payload = {"data": [f"data:image/jpeg;base64,{b64}"]}
+    res = safe_post(FACE_API, payload)
+
+    embedding = np.array(res["data"][0], dtype=np.float32)
+    label = res["data"][1]
+
+    if embedding.shape[0] != FACE_DIM:
+        raise ValueError("Face embedding dimension mismatch")
+
+    return embedding, label
+
+# ===============================
+# GATED FUSION (PURE NUMPY)
+# ===============================
+
+def gated_fusion(text_emb, face_emb):
     """
-    result = text_client.predict(
-        input_ids={"text": text},
-        attention_mask={"text": text},
-        api_name="/predict"
+    g = sigmoid(Wg[t;f])
+    fused = g*t + (1-g)*f
+    """
+
+    # Project to same dim
+    Wt = np.random.randn(TEXT_DIM, FUSION_DIM) * 0.01
+    Wf = np.random.randn(FACE_DIM, FUSION_DIM) * 0.01
+    Wg = np.random.randn(FUSION_DIM * 2, FUSION_DIM) * 0.01
+
+    t = text_emb @ Wt
+    f = face_emb @ Wf
+
+    concat = np.concatenate([t, f])
+    g = 1 / (1 + np.exp(-(concat @ Wg)))
+
+    fused = g * t + (1 - g) * f
+    return fused
+
+# ===============================
+# RESPONSE LOGIC (MEPE CORE)
+# ===============================
+
+def generate_mepe_response(text, emotion):
+    return (
+        f"I sense **{emotion}** in how you’re expressing yourself.\n\n"
+        f"You don’t have to suppress it. Want to talk through what triggered this?"
     )
 
-    label = result[0][0]
-    confidence = result[0][1]
-    return label, confidence
+# ===============================
+# STREAMLIT UI
+# ===============================
 
+st.set_page_config(page_title="MEPE", layout="centered")
+st.title("🧠 MEPE — Multimodal Emotion Persona Engine")
 
-# ================================
-# FACE EMOTION CALL
-# ================================
-def predict_face_emotion(img: Image.Image):
-    """
-    Gradio contract:
-    /predict(image)
+user_text = st.text_area("💬 Say something", height=120)
 
-    Uses handle_file for upload.
-    Output: [[label, confidence]]
-    """
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-        img.save(tmp.name)
-        tmp_path = tmp.name
+image = st.camera_input("📸 Face Input")
+
+run = st.button("Analyze")
+
+if run:
+    if not user_text or image is None:
+        st.error("Text AND face input are required.")
+        st.stop()
 
     try:
-        result = face_client.predict(
-            image=handle_file(tmp_path),
-            api_name="/predict"
-        )
-
-        label = result[0][0]
-        confidence = result[0][1]
-        return label, confidence
-
-    finally:
-        os.remove(tmp_path)
-
-
-# ================================
-# FUSION LOGIC (CORE INTELLIGENCE)
-# ================================
-def resolve_final_emotion(text_out, face_out):
-    """
-    Confidence-aware multimodal fusion.
-
-    Rules:
-    1. Agreement → accept emotion
-    2. High-confidence text → trust intent
-    3. Stronger face signal → override text
-    4. Otherwise → default to text
-    """
-
-    text_label, text_conf = text_out
-    face_label, face_conf = face_out
-
-    # 1️⃣ Agreement
-    if text_label == face_label:
-        return text_label
-
-    # 2️⃣ Strong linguistic intent
-    if text_conf >= 0.70:
-        return text_label
-
-    # 3️⃣ Facial dominance
-    if face_conf - text_conf >= 0.25:
-        return face_label
-
-    # 4️⃣ Safe default
-    return text_label
-
-
-# ================================
-# RESPONSE GENERATION (SIMPLE)
-# ================================
-def generate_response(user_text: str, emotion: str) -> str:
-    return (
-        f"I sense **{emotion}**. "
-        "Pause for a moment, take a slow breath, "
-        "and focus on one small thing you can control right now."
-    )
-
-
-# ================================
-# UI
-# ================================
-user_text = st.text_area("How are you feeling?")
-image = st.camera_input("Capture your facial expression")
-
-if st.button("Analyze & Respond"):
-    if not user_text or image is None:
-        st.warning("Both text and face input are required.")
-    else:
         img = Image.open(image)
 
         with st.spinner("Understanding you..."):
-            text_out = predict_text_emotion(user_text)
-            face_out = predict_face_emotion(img)
-            final_emotion = resolve_final_emotion(text_out, face_out)
-            response = generate_response(user_text, final_emotion)
+            text_emb, text_label = predict_text_emotion(user_text)
+            face_emb, face_label = predict_face_emotion(img)
 
-        st.subheader("🧭 Inferred Emotional State")
+            fused_emb = gated_fusion(text_emb, face_emb)
+
+            # RULE: face overrides text if conflict
+            final_emotion = face_label if face_label != text_label else text_label
+
+            response = generate_mepe_response(user_text, final_emotion)
+
+        st.subheader("🧭 Inferred Emotion")
         st.write(final_emotion)
-
-        st.subheader("📊 Model Signals")
-        st.write({
-            "text_emotion": text_out,
-            "face_emotion": face_out
-        })
 
         st.subheader("💬 MEPE Response")
         st.write(response)
+
+    except Exception as e:
+        st.error(f"MEPE failed: {e}")
