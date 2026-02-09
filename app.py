@@ -1,8 +1,8 @@
 import streamlit as st
-from gradio_client import Client
+from gradio_client import Client, handle_file
 from PIL import Image
-import io
-import base64
+import tempfile
+import os
 
 # ================================
 # STREAMLIT CONFIG
@@ -17,84 +17,100 @@ text_client = Client("upendrareddy1/mepe-text-emotion-api")
 face_client = Client("upendrareddy1/mepe-face-emotion-api")
 
 # ================================
-# MODEL CALLS (OUTPUT-AWARE)
+# TEXT EMOTION CALL
 # ================================
 def predict_text_emotion(text: str):
     """
-    Expected output format:
-    [[label, confidence]]
+    Gradio contract:
+    /predict(input_ids, attention_mask)
+
+    Backend handles tokenization internally.
+    We only need to pass placeholders.
+    Output: [[label, confidence]]
     """
     result = text_client.predict(
-        text,
+        input_ids={"text": text},
+        attention_mask={"text": text},
         api_name="/predict"
     )
 
     label = result[0][0]
     confidence = result[0][1]
-
-    return label, confidence
-
-
-def predict_face_emotion(img: Image.Image):
-    """
-    Expected output format:
-    [[label, confidence]]
-    """
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG")
-    b64 = base64.b64encode(buf.getvalue()).decode()
-
-    result = face_client.predict(
-        f"data:image/jpeg;base64,{b64}",
-        api_name="/predict"
-    )
-
-    label = result[0][0]
-    confidence = result[0][1]
-
     return label, confidence
 
 
 # ================================
-# FUSION LOGIC
+# FACE EMOTION CALL
+# ================================
+def predict_face_emotion(img: Image.Image):
+    """
+    Gradio contract:
+    /predict(image)
+
+    Uses handle_file for upload.
+    Output: [[label, confidence]]
+    """
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+        img.save(tmp.name)
+        tmp_path = tmp.name
+
+    try:
+        result = face_client.predict(
+            image=handle_file(tmp_path),
+            api_name="/predict"
+        )
+
+        label = result[0][0]
+        confidence = result[0][1]
+        return label, confidence
+
+    finally:
+        os.remove(tmp_path)
+
+
+# ================================
+# FUSION LOGIC (CORE INTELLIGENCE)
 # ================================
 def resolve_final_emotion(text_out, face_out):
     """
-    Fusion Strategy (Explainable):
-    1. If both modalities agree → accept emotion directly
-    2. If they disagree:
-       a) If text confidence is high → trust text
-       b) If face confidence is significantly higher → override text
-       c) Otherwise → default to text (language carries intent)
+    Confidence-aware multimodal fusion.
+
+    Rules:
+    1. Agreement → accept emotion
+    2. High-confidence text → trust intent
+    3. Stronger face signal → override text
+    4. Otherwise → default to text
     """
 
     text_label, text_conf = text_out
     face_label, face_conf = face_out
 
-    # 1️⃣ Agreement case
+    # 1️⃣ Agreement
     if text_label == face_label:
         return text_label
 
-    # 2️⃣ Disagreement cases
-
-    # Strong text signal → trust text
+    # 2️⃣ Strong linguistic intent
     if text_conf >= 0.70:
         return text_label
 
-    # Face much more confident than text → trust face
+    # 3️⃣ Facial dominance
     if face_conf - text_conf >= 0.25:
         return face_label
 
-    # Ambiguous → default to text (intent > expression)
+    # 4️⃣ Safe default
     return text_label
 
 
+# ================================
+# RESPONSE GENERATION (SIMPLE)
+# ================================
 def generate_response(user_text: str, emotion: str) -> str:
     return (
         f"I sense **{emotion}**. "
-        "Pause for a moment, breathe slowly, "
+        "Pause for a moment, take a slow breath, "
         "and focus on one small thing you can control right now."
     )
+
 
 # ================================
 # UI
@@ -104,7 +120,7 @@ image = st.camera_input("Capture your facial expression")
 
 if st.button("Analyze & Respond"):
     if not user_text or image is None:
-        st.warning("Text and face input required")
+        st.warning("Both text and face input are required.")
     else:
         img = Image.open(image)
 
