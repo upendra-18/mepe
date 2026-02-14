@@ -2,19 +2,17 @@ import streamlit as st
 import numpy as np
 from gradio_client import Client
 import tempfile
-from openai import OpenAI
 
 # -----------------------
 # CONFIG
 # -----------------------
 
 HF_SPACE_ID = "upendrareddy1/mepe"
+HF_TOKEN = "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"
 
 # Gradio client (HF Space)
 hf_client = Client(HF_SPACE_ID)
 
-# OpenAI client
-llm_client = OpenAI(api_key="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")
 
 
 # -----------------------
@@ -52,6 +50,11 @@ def get_persona_embedding(text, image_bytes):
 # LLM Response Generator
 # -----------------------
 
+import requests
+
+HF_LLM_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
+HF_TOKEN = "your_hf_token_here"
+
 def generate_response(persona_vector, user_text):
 
     prompt = f"""
@@ -67,15 +70,31 @@ Generate a supportive, emotionally aligned response.
 Keep it natural and human.
 """
 
-    response = llm_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are emotionally intelligent."},
-            {"role": "user", "content": prompt}
-        ]
+    headers = {
+        "Authorization": f"Bearer {HF_TOKEN}"
+    }
+
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 200,
+            "temperature": 0.7
+        }
+    }
+
+    response = requests.post(
+        f"https://api-inference.huggingface.co/models/{HF_LLM_MODEL}",
+        headers=headers,
+        json=payload
     )
 
-    return response.choices[0].message.content
+    if response.status_code != 200:
+        return f"LLM Error: {response.text}"
+
+    output = response.json()
+
+    return output[0]["generated_text"]
+
 
 
 # -----------------------
