@@ -7,7 +7,7 @@ import openai
 # CONFIG
 # -----------------------
 
-HF_API_URL = "https://upendrareddy1-mepe.hf.space/run/mepe_inference"
+HF_API_URL = "https://upendrareddy1-mepe.hf.space/api/predict/"
 OPENAI_API_KEY = "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"
 
 openai.api_key = OPENAI_API_KEY
@@ -20,29 +20,26 @@ openai.api_key = OPENAI_API_KEY
 def get_persona_embedding(text, image_bytes):
 
     files = {
-        "image": ("image.png", image_bytes, "image/png")
+        "data": (
+            None,
+            str([text])  # text input as list
+        ),
+        "files": (
+            "image.png",
+            image_bytes,
+            "image/png"
+        )
     }
 
-    data = {
-        "text": text
-    }
-
-    response = requests.post(
-        HF_API_URL,
-        data=data,
-        files=files,
-        timeout=120
-    )
+    response = requests.post(HF_API_URL, files=files)
 
     if response.status_code != 200:
         return None, response.text
 
     result = response.json()
 
-    # If your Space returns full vector:
-    # return result["gated_fusion"], None
+    return result["data"][0], None
 
-    return result, None
 
 
 # -----------------------
