@@ -9,9 +9,7 @@ import tempfile
 # -----------------------
 
 HF_SPACE_ID = "upendrareddy1/mepe"
-OPENAI_API_KEY = ""
 
-openai.api_key = OPENAI_API_KEY
 
 # Initialize client once
 client = Client(HF_SPACE_ID)
