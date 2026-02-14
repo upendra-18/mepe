@@ -14,7 +14,7 @@ HF_SPACE_ID = "upendrareddy1/mepe"
 hf_client = Client(HF_SPACE_ID)
 
 # OpenAI client
-llm_client = OpenAI(api_key="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")
+llm_client = OpenAI(api_key="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")
 
 
 # -----------------------
