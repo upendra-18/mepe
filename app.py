@@ -53,7 +53,6 @@ def get_persona_embedding(text, image_bytes):
 import requests
 
 HF_LLM_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
-HF_TOKEN = "your_hf_token_here"
 
 def generate_response(persona_vector, user_text):
 
