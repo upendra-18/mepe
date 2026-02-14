@@ -21,6 +21,8 @@ llm_client = OpenAI(api_key="sk-or-v1-d733addd7bb0b6447ae9ab46447a3bfae56722bde1
 # Call HF Space
 # -----------------------
 
+from gradio_client import handle_file
+
 def get_persona_embedding(text, image_bytes):
 
     try:
@@ -29,20 +31,21 @@ def get_persona_embedding(text, image_bytes):
             tmp.write(image_bytes)
             temp_path = tmp.name
 
-        # Call HF Space API
+        # Call HF Space API (USE handle_file)
         result = hf_client.predict(
             text=text,
-            image=temp_path,   # pass file path directly (NO handle_file)
+            image=handle_file(temp_path),   # <-- THIS IS THE ONLY CHANGE
             api_name="/mepe_inference"
         )
 
-        # Your space already returns embedding
+        # Your space returns embedding
         persona_vector = result["persona_embedding"]
 
         return persona_vector, None
 
     except Exception as e:
         return None, str(e)
+
 
 
 # -----------------------
