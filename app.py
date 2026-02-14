@@ -37,7 +37,7 @@ def get_persona_embedding(text, image_bytes):
         )
 
         # Your space already returns embedding
-        persona_vector = result
+        persona_vector = result["persona_embedding"]
 
         return persona_vector, None
 
