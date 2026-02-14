@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import numpy as np
-import openai
 from gradio_client import Client, handle_file
 import tempfile
 
@@ -10,7 +9,7 @@ import tempfile
 # -----------------------
 
 HF_SPACE_ID = "upendrareddy1/mepe"
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = ""
 
 openai.api_key = OPENAI_API_KEY
 
@@ -50,6 +49,10 @@ def get_persona_embedding(text, image_bytes):
 # LLM Response Generator
 # -----------------------
 
+from openai import OpenAI
+
+client = OpenAI(api_key="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")
+
 def generate_response(persona_vector, user_text):
 
     prompt = f"""
@@ -65,7 +68,7 @@ Generate a supportive, emotionally aligned response.
 Keep it natural and human.
 """
 
-    completion = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You are emotionally intelligent."},
@@ -73,7 +76,8 @@ Keep it natural and human.
         ]
     )
 
-    return completion.choices[0].message.content
+    return response.choices[0].message.content
+
 
 
 # -----------------------
