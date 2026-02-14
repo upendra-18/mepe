@@ -1,8 +1,8 @@
 import streamlit as st
-import requests
 import numpy as np
-from gradio_client import Client, handle_file
+from gradio_client import Client
 import tempfile
+from openai import OpenAI
 
 # -----------------------
 # CONFIG
@@ -10,9 +10,12 @@ import tempfile
 
 HF_SPACE_ID = "upendrareddy1/mepe"
 
+# Gradio client (HF Space)
+hf_client = Client(HF_SPACE_ID)
 
-# Initialize client once
-client = Client(HF_SPACE_ID)
+# OpenAI client
+llm_client = OpenAI(api_key="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")
+
 
 # -----------------------
 # Call HF Space
@@ -26,15 +29,14 @@ def get_persona_embedding(text, image_bytes):
             tmp.write(image_bytes)
             temp_path = tmp.name
 
-        result = client.predict(
+        # Call HF Space API
+        result = hf_client.predict(
             text=text,
-            image=handle_file(temp_path),
+            image=temp_path,   # pass file path directly (NO handle_file)
             api_name="/mepe_inference"
         )
 
-        # If your space returns embedding directly:
-        # result will already be the JSON/dict returned from Gradio
-
+        # Your space already returns embedding
         persona_vector = result
 
         return persona_vector, None
@@ -46,10 +48,6 @@ def get_persona_embedding(text, image_bytes):
 # -----------------------
 # LLM Response Generator
 # -----------------------
-
-from openai import OpenAI
-
-client = OpenAI(api_key="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")
 
 def generate_response(persona_vector, user_text):
 
@@ -66,7 +64,7 @@ Generate a supportive, emotionally aligned response.
 Keep it natural and human.
 """
 
-    response = client.chat.completions.create(
+    response = llm_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You are emotionally intelligent."},
@@ -75,7 +73,6 @@ Keep it natural and human.
     )
 
     return response.choices[0].message.content
-
 
 
 # -----------------------
