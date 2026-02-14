@@ -8,7 +8,7 @@ import tempfile
 # -----------------------
 
 HF_SPACE_ID = "upendrareddy1/mepe"
-HF_TOKEN = "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"
+HF_TOKEN = "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"
 
 # Gradio client (HF Space)
 hf_client = Client(HF_SPACE_ID)
