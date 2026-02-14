@@ -2,8 +2,7 @@ import streamlit as st
 import requests
 import numpy as np
 import openai
-from gradio_client import Client
-from gradio_client.utils import handle_file
+from gradio_client import Client, handle_file
 import tempfile
 
 # -----------------------
