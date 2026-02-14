@@ -2,44 +2,48 @@ import streamlit as st
 import requests
 import numpy as np
 import openai
+from gradio_client import Client, handle_file
+import tempfile
 
 # -----------------------
 # CONFIG
 # -----------------------
 
-HF_API_URL = "https://huggingface.co/spaces/upendrareddy1/mepe"
+HF_SPACE_ID = "upendrareddy1/mepe"
 OPENAI_API_KEY = "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"
 
 openai.api_key = OPENAI_API_KEY
 
+# Initialize client once
+client = Client(HF_SPACE_ID)
 
 # -----------------------
-# Call HF Space (FIXED ONLY THIS PART)
+# Call HF Space
 # -----------------------
 
 def get_persona_embedding(text, image_bytes):
 
-    files = {
-        "data": (
-            None,
-            str([text])  # text input as list
-        ),
-        "files": (
-            "image.png",
-            image_bytes,
-            "image/png"
+    try:
+        # Save image temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+            tmp.write(image_bytes)
+            temp_path = tmp.name
+
+        result = client.predict(
+            text=text,
+            image=handle_file(temp_path),
+            api_name="/mepe_inference"
         )
-    }
 
-    response = requests.post(HF_API_URL, files=files)
+        # If your space returns embedding directly:
+        # result will already be the JSON/dict returned from Gradio
 
-    if response.status_code != 200:
-        return None, response.text
+        persona_vector = result
 
-    result = response.json()
+        return persona_vector, None
 
-    return result["data"][0], None
-
+    except Exception as e:
+        return None, str(e)
 
 
 # -----------------------
