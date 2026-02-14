@@ -7,7 +7,7 @@ import openai
 # CONFIG
 # -----------------------
 
-HF_API_URL = "https://upendrareddy1-mepe.hf.space/api/predict/"
+HF_API_URL = "https://huggingface.co/spaces/upendrareddy1/mepe"
 OPENAI_API_KEY = "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"
 
 openai.api_key = OPENAI_API_KEY
