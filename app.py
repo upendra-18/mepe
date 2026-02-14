@@ -83,7 +83,7 @@ Keep it natural and human.
     }
 
     response = requests.post(
-        f"https://api-inference.huggingface.co/models/{HF_LLM_MODEL}",
+        f"https://router.huggingface.co/hf-inference/models/models/{HF_LLM_MODEL}",
         headers=headers,
         json=payload
     )
