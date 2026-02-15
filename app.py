@@ -50,6 +50,10 @@ def get_persona_embedding(text, image_bytes):
 # LLM Response Generator
 # -----------------------
 
+# -----------------------
+# LLM Response Generator
+# -----------------------
+
 import requests
 
 HF_LLM_MODEL = "mistralai/Mistral-7B-Instruct"
@@ -59,30 +63,46 @@ headers = {
     "Content-Type": "application/json"
 }
 
-payload = {
-    "inputs": prompt,
-    "parameters": {
-        "max_new_tokens": 300,
-        "temperature": 0.7
+def generate_response(persona_vector, user_text):
+
+    prompt = f"""
+You are an emotionally intelligent assistant.
+
+Persona vector (512-dim):
+{persona_vector}
+
+User message:
+{user_text}
+
+Generate a supportive, emotionally aligned response.
+Keep it natural and human.
+"""
+
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 300,
+            "temperature": 0.7
+        }
     }
-}
 
-response = requests.post(
-    f"https://router.huggingface.co/hf-inference/models/{HF_LLM_MODEL}",
-    headers=headers,
-    json=payload,
-    timeout=60
-)
+    response = requests.post(
+        f"https://router.huggingface.co/hf-inference/models/{HF_LLM_MODEL}",
+        headers=headers,
+        json=payload,
+        timeout=60
+    )
 
-if response.status_code != 200:
-    return f"LLM Error: {response.text}"
+    if response.status_code != 200:
+        return f"LLM Error: {response.text}"
 
-result = response.json()
+    result = response.json()
 
-# Mistral returns list format
-reply = result[0]["generated_text"]
+    # Mistral returns list format
+    reply = result[0]["generated_text"]
 
-return reply
+    return reply
+
 
 
 
