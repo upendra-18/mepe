@@ -28,10 +28,7 @@ textarea {
     font-size: 16px !important;
 }
 
-/* Camera container styling */
-[data-testid="stCameraInput"] {
-    height: 260px !important;
-}
+
 
 /* Full width gradient button */
 div.stButton > button {
