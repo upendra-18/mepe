@@ -116,56 +116,84 @@ Keep it natural and human.
 
 st.set_page_config(page_title="MEPE", layout="wide")
 
-st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
-st.markdown("### Emotion-Aware, Persona-Aligned AI System")
+st.markdown("""
+<style>
+.big-title {
+    font-size: 42px;
+    font-weight: 800;
+}
+.subtle {
+    color: #888;
+}
+.persona-card {
+    padding: 20px;
+    border-radius: 15px;
+    background-color: #111;
+}
+.response-card {
+    padding: 20px;
+    border-radius: 15px;
+    background-color: #1a1a1a;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown('<div class="big-title">🧠 MEPE</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtle">Multimodal Emotion Persona Engine</div>', unsafe_allow_html=True)
+
+st.divider()
 
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("📝 User Input")
-    text_input = st.text_area("Enter your message")
-
-    image_input = st.file_uploader(
-        "Upload face image",
-        type=["png", "jpg", "jpeg"]
-    )
+    st.markdown("### 📝 Input Signals")
+    text_input = st.text_area("Message")
+    image_input = st.file_uploader("Face Image", type=["png", "jpg", "jpeg"])
 
 with col2:
-    st.subheader("🔍 Detected Persona Insights")
-    persona_display = st.empty()
+    st.markdown("### 🔍 Detected Persona")
+    persona_placeholder = st.empty()
 
-# -----------------------
-# Button Action
-# -----------------------
+st.divider()
 
-if st.button("Generate Emotion-Aware Response"):
+if st.button("Generate Emotion-Aware Response", use_container_width=True):
 
     if not text_input or not image_input:
         st.error("Both text and image required.")
     else:
 
-        with st.spinner("Analyzing multimodal signals..."):
+        with st.spinner("Extracting multimodal persona representation..."):
             image_bytes = image_input.read()
             persona_vector, error = get_persona_embedding(text_input, image_bytes)
 
         if error:
             st.error(error)
-
         else:
 
             persona_info = summarize_persona(persona_vector)
 
-            with col2:
-                st.metric("Persona Type", persona_info["persona_type"])
+            with persona_placeholder.container():
+                st.markdown("#### 🎭 Persona Profile")
+                st.markdown(f"**Type:** {persona_info['persona_type']}")
+                st.markdown(f"**Embedding Dimension:** 512")
                 st.metric("Emotional Intensity", persona_info["emotional_intensity"])
-                st.metric("Positivity Score", persona_info["positivity_score"])
-                st.metric("Dominance Score", persona_info["dominance_score"])
-
                 st.progress(min(persona_info["emotional_intensity"] / 50, 1.0))
 
-            with st.spinner("Generating emotionally aligned response..."):
+                with st.expander("Technical Details"):
+                    st.write("Raw Embedding (first 10 dims):")
+                    st.write(persona_vector[:10])
+
+            with st.spinner("Generating persona-aligned response..."):
                 reply = generate_response(persona_vector, text_input)
 
             st.divider()
-            st.subheader("🤖 Emotion-Aware Response")
-            st.success(reply)
+            st.markdown("### 🤖 Emotion-Aware Response")
+
+            st.markdown("""
+            <div class="response-card">
+            """, unsafe_allow_html=True)
+
+            st.write(reply)
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
