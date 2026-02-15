@@ -31,13 +31,13 @@ html, body, [class*="css"]  {
 
 /* Text area styling */
 textarea {
-    height: 260px !important;
+    height: 130px !important;
     font-size: 16px !important;
 }
 
 /* Camera styling */
 div[data-testid="stCameraInput"] {
-    height: 260px !important;
+    height: 130px !important;
 }
 
 /* Remove widget bottom spacing */
