@@ -11,7 +11,8 @@ import requests
 HF_SPACE_ID = "upendrareddy1/mepe"
 HF_TOKEN = st.secrets["HF_TOKEN"]
 
-HF_LLM_MODEL = "mistralai/Mistral-7B-Instruct"
+HF_LLM_MODEL = "HuggingFaceH4/zephyr-7b-beta"
+
 
 # Initialize HF Space client
 hf_client = Client(HF_SPACE_ID)
