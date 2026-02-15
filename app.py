@@ -75,7 +75,7 @@ Keep it natural and human.
     }
 
     payload = {
-        "model": "llama-3.1-8b-instant",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {"role": "system", "content": "You are emotionally intelligent."},
             {"role": "user", "content": prompt}
