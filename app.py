@@ -218,7 +218,12 @@ with col1:
 with col2:
     st.markdown('<div class="section-title">📷 Face Input (Live Camera)</div>', unsafe_allow_html=True)
     st.markdown('<div style="height:260px;">', unsafe_allow_html=True)
-    image_input = st.camera_input("Capture Face")
+    image_input = st.camera_input(
+        "Capture Face",
+        key="camera",
+        help="Use live camera capture"
+    )
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 
