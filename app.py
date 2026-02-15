@@ -4,55 +4,77 @@ from gradio_client import Client, handle_file
 import tempfile
 import requests
 
-# -----------------------
+# --------------------------------------------------
 # PAGE CONFIG
-# -----------------------
+# --------------------------------------------------
 
 st.set_page_config(page_title="MEPE", layout="wide")
 
 st.markdown("""
 <style>
-.big-button button {
+
+html, body, [class*="css"]  {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Full width primary button */
+div.stButton > button {
     width: 100%;
-    height: 60px;
-    font-size: 20px;
-    font-weight: 600;
-    border-radius: 12px;
-    background-color: #4F46E5;
-    color: white;
-}
-
-.persona-box {
-    padding: 20px;
-    border-radius: 12px;
-    background-color: #111827;
-    border: 1px solid #374151;
-}
-
-.response-box {
-    padding: 25px;
+    height: 70px;
+    font-size: 22px;
+    font-weight: 700;
     border-radius: 14px;
-    background-color: #0F172A;
-    border: 1px solid #334155;
+    background: linear-gradient(90deg,#6366F1,#8B5CF6);
+    color: white;
+    border: none;
 }
+
+div.stButton > button:hover {
+    background: linear-gradient(90deg,#4F46E5,#7C3AED);
+}
+
+/* Persona box */
+.persona-box {
+    padding: 28px;
+    border-radius: 16px;
+    background-color: #0F172A;
+    border: 1px solid #1E293B;
+    font-size: 18px;
+}
+
+/* Response box */
+.response-box {
+    padding: 35px;
+    border-radius: 18px;
+    background-color: #0B1120;
+    border: 1px solid #1E293B;
+    font-size: 18px;
+    line-height: 1.7;
+}
+
+.section-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------
+# --------------------------------------------------
 # CONFIG
-# -----------------------
+# --------------------------------------------------
 
 HF_SPACE_ID = "upendrareddy1/mepe"
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
 hf_client = Client(HF_SPACE_ID)
 
-# -----------------------
-# CALL HF SPACE
-# -----------------------
+# --------------------------------------------------
+# GET PERSONA EMBEDDING
+# --------------------------------------------------
 
 def get_persona_embedding(text, image_bytes):
-
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
             tmp.write(image_bytes)
@@ -65,34 +87,29 @@ def get_persona_embedding(text, image_bytes):
         )
 
         persona_vector = result["persona_embedding"]
-
         return persona_vector, None
 
     except Exception as e:
         return None, str(e)
 
-# -----------------------
+# --------------------------------------------------
 # PERSONA INTERPRETER (LLM)
-# -----------------------
+# --------------------------------------------------
 
 def interpret_persona(persona_vector):
 
     prompt = f"""
 You are a behavioral AI analyst.
 
-You are given a 512-dimensional fused multimodal embedding
-derived from text + facial emotion signals.
+This is a fused multimodal embedding (text + face):
 
-Embedding:
 {persona_vector}
 
-Interpret this embedding and summarize the persona in 3-4 lines.
-Focus on:
+Summarize clearly in 3 lines:
 - Communication style
 - Emotional tone
 - Energy level
-
-Keep it simple and clear.
+Keep it concise.
 """
 
     headers = {
@@ -103,11 +120,11 @@ Keep it simple and clear.
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
-            {"role": "system", "content": "You are a psychological embedding interpreter."},
+            {"role": "system", "content": "You interpret behavioral embeddings."},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.4,
-        "max_tokens": 250
+        "max_tokens": 200
     }
 
     response = requests.post(
@@ -123,27 +140,24 @@ Keep it simple and clear.
     result = response.json()
     return result["choices"][0]["message"]["content"]
 
-# -----------------------
-# RESPONSE GENERATOR (LLM)
-# -----------------------
+# --------------------------------------------------
+# RESPONSE GENERATOR
+# --------------------------------------------------
 
 def generate_response(persona_vector, persona_summary, user_text):
 
     prompt = f"""
-You are an emotionally intelligent assistant.
-
 Detected Persona:
 {persona_summary}
 
-Full Multimodal Embedding:
+Embedding:
 {persona_vector}
 
 User Message:
 {user_text}
 
-Generate a response aligned with the detected persona.
+Generate a response aligned with the persona.
 Adapt tone and emotional intensity accordingly.
-Be natural and human.
 """
 
     headers = {
@@ -154,7 +168,7 @@ Be natural and human.
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
-            {"role": "system", "content": "You generate persona-aligned responses."},
+            {"role": "system", "content": "Generate persona-aligned responses."},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
@@ -174,44 +188,43 @@ Be natural and human.
     result = response.json()
     return result["choices"][0]["message"]["content"]
 
-# -----------------------
-# UI
-# -----------------------
+# --------------------------------------------------
+# UI LAYOUT
+# --------------------------------------------------
 
-st.title("🧠 MEPE – Multimodal Emotion Persona Engine")
+st.markdown("## 🧠 MEPE – Multimodal Emotion Persona Engine")
 
-# INPUT ROW
+st.markdown("")
+
+# 50 / 50 GRID (FULL WIDTH)
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("📝 Input Signals")
-    text_input = st.text_area("Message", height=150)
+    st.markdown('<div class="section-title">📝 Input Signals</div>', unsafe_allow_html=True)
+    text_input = st.text_area("", height=220, placeholder="Enter your message...")
 
 with col2:
-    st.subheader("📷 Face Input")
-    image_input = st.file_uploader(
-        "Upload face image",
-        type=["png", "jpg", "jpeg"]
-    )
+    st.markdown('<div class="section-title">📷 Face Input</div>', unsafe_allow_html=True)
+    image_input = st.file_uploader("", type=["png", "jpg", "jpeg"])
 
-st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("")
 
-st.markdown('<div class="big-button">', unsafe_allow_html=True)
+# FULL WIDTH BUTTON
 generate = st.button("🚀 Generate Persona-Aware Response")
-st.markdown('</div>', unsafe_allow_html=True)
 
-# -----------------------
+st.markdown("")
+
+# --------------------------------------------------
 # EXECUTION
-# -----------------------
+# --------------------------------------------------
 
 if generate:
 
     if not text_input or not image_input:
-        st.error("Both text and image required.")
+        st.error("Both text and image are required.")
     else:
 
         with st.spinner("Extracting multimodal embedding..."):
-
             image_bytes = image_input.read()
             persona_vector, error = get_persona_embedding(text_input, image_bytes)
 
@@ -233,10 +246,12 @@ if generate:
                 unsafe_allow_html=True
             )
 
+            st.markdown("")
+
             with st.spinner("Generating response..."):
                 reply = generate_response(persona_vector, persona_summary, text_input)
 
-            st.markdown("### 🤖 Emotion-Aware Response")
+            st.markdown("### 🤖 Generated Response")
             st.markdown(
                 f"""
                 <div class="response-box">
