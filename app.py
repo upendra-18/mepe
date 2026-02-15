@@ -8,7 +8,7 @@ import tempfile
 # -----------------------
 
 HF_SPACE_ID = "upendrareddy1/mepe"
-HF_TOKEN = "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"
+HF_TOKEN = st.secrets["HF_TOKEN"]
 
 # Gradio client (HF Space)
 hf_client = Client(HF_SPACE_ID)
