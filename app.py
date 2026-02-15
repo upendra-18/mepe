@@ -86,7 +86,8 @@ Keep it natural and human.
     )
 
     if response.status_code != 200:
-        return f"LLM Error: {response.text}"
+        return f"LLM Error {response.status_code}: {response.text}"
+
 
     result = response.json()
 
