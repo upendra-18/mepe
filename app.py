@@ -1,7 +1,8 @@
 import streamlit as st
 import numpy as np
-from gradio_client import Client
+from gradio_client import Client, handle_file
 import tempfile
+import requests
 
 # -----------------------
 # CONFIG
@@ -10,33 +11,32 @@ import tempfile
 HF_SPACE_ID = "upendrareddy1/mepe"
 HF_TOKEN = st.secrets["HF_TOKEN"]
 
-# Gradio client (HF Space)
-hf_client = Client(HF_SPACE_ID)
+HF_LLM_MODEL = "mistralai/Mistral-7B-Instruct"
 
+# Initialize HF Space client
+hf_client = Client(HF_SPACE_ID)
 
 
 # -----------------------
 # Call HF Space
 # -----------------------
 
-from gradio_client import handle_file
-
 def get_persona_embedding(text, image_bytes):
 
     try:
-        # Save image temporarily
+        # Save uploaded image temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
             tmp.write(image_bytes)
             temp_path = tmp.name
 
-        # Call HF Space API (USE handle_file)
+        # Call HF Space API
         result = hf_client.predict(
             text=text,
-            image=handle_file(temp_path),   # <-- THIS IS THE ONLY CHANGE
+            image=handle_file(temp_path),
             api_name="/mepe_inference"
         )
 
-        # Your space returns embedding
+        # Extract embedding
         persona_vector = result["persona_embedding"]
 
         return persona_vector, None
@@ -45,23 +45,9 @@ def get_persona_embedding(text, image_bytes):
         return None, str(e)
 
 
-
 # -----------------------
 # LLM Response Generator
 # -----------------------
-
-# -----------------------
-# LLM Response Generator
-# -----------------------
-
-import requests
-
-HF_LLM_MODEL = "mistralai/Mistral-7B-Instruct"
-
-headers = {
-    "Authorization": f"Bearer {HF_TOKEN}",
-    "Content-Type": "application/json"
-}
 
 def generate_response(persona_vector, user_text):
 
@@ -77,6 +63,11 @@ User message:
 Generate a supportive, emotionally aligned response.
 Keep it natural and human.
 """
+
+    headers = {
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
+    }
 
     payload = {
         "inputs": prompt,
@@ -99,12 +90,7 @@ Keep it natural and human.
     result = response.json()
 
     # Mistral returns list format
-    reply = result[0]["generated_text"]
-
-    return reply
-
-
-
+    return result[0]["generated_text"]
 
 
 # -----------------------
@@ -129,12 +115,12 @@ if st.button("Generate Response"):
             image_bytes = image_input.read()
             persona_vector, error = get_persona_embedding(text_input, image_bytes)
 
-            if error:
-                st.error(error)
-            else:
+        if error:
+            st.error(error)
+        else:
 
-                with st.spinner("Generating response..."):
-                    reply = generate_response(persona_vector, text_input)
+            with st.spinner("Generating response..."):
+                reply = generate_response(persona_vector, text_input)
 
-                st.success("Response generated.")
-                st.write(reply)
+            st.success("Response generated.")
+            st.write(reply)
