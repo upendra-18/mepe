@@ -9,10 +9,6 @@ import requests
 # -----------------------
 
 HF_SPACE_ID = "upendrareddy1/mepe"
-HF_TOKEN = st.secrets["HF_TOKEN"]
-
-HF_LLM_MODEL = "HuggingFaceH4/zephyr-7b-beta"
-
 
 # Initialize HF Space client
 hf_client = Client(HF_SPACE_ID)
@@ -50,6 +46,14 @@ def get_persona_embedding(text, image_bytes):
 # LLM Response Generator
 # -----------------------
 
+# -----------------------
+# LLM Response Generator (Groq)
+# -----------------------
+
+import requests
+
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+
 def generate_response(persona_vector, user_text):
 
     prompt = f"""
@@ -66,20 +70,22 @@ Keep it natural and human.
 """
 
     headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
+        "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
 
     payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": 300,
-            "temperature": 0.7
-        }
+        "model": "llama3-8b-8192",
+        "messages": [
+            {"role": "system", "content": "You are emotionally intelligent."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 400
     }
 
     response = requests.post(
-        f"https://router.huggingface.co/hf-inference/models/{HF_LLM_MODEL}",
+        "https://api.groq.com/openai/v1/chat/completions",
         headers=headers,
         json=payload,
         timeout=60
@@ -88,11 +94,10 @@ Keep it natural and human.
     if response.status_code != 200:
         return f"LLM Error {response.status_code}: {response.text}"
 
-
     result = response.json()
 
-    # Mistral returns list format
-    return result[0]["generated_text"]
+    return result["choices"][0]["message"]["content"]
+
 
 
 # -----------------------
