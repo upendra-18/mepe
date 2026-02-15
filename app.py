@@ -14,33 +14,7 @@ GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 hf_client = Client(HF_SPACE_ID)
 
 # -----------------------
-# Persona Summary Logic
-# -----------------------
-
-def summarize_persona(persona_vector):
-    vec = np.array(persona_vector)
-
-    intensity = float(np.linalg.norm(vec))
-    positivity = float(np.mean(vec[:100]))
-    dominance = float(np.mean(vec[100:200]))
-
-    # Simple persona type heuristic
-    if positivity > 0.05:
-        persona_type = "Warm & Expressive"
-    elif dominance > 0.05:
-        persona_type = "Confident & Assertive"
-    else:
-        persona_type = "Analytical & Reserved"
-
-    return {
-        "emotional_intensity": round(intensity, 2),
-        "positivity_score": round(positivity, 3),
-        "dominance_score": round(dominance, 3),
-        "persona_type": persona_type
-    }
-
-# -----------------------
-# Call HF Space
+# Persona Embedding
 # -----------------------
 
 def get_persona_embedding(text, image_bytes):
@@ -57,14 +31,68 @@ def get_persona_embedding(text, image_bytes):
         )
 
         persona_vector = result["persona_embedding"]
-
-        return persona_vector, None
+        return np.array(persona_vector), None
 
     except Exception as e:
         return None, str(e)
 
 # -----------------------
-# LLM Response Generator (Groq)
+# Persona Interpretation (LIGHT MODEL)
+# -----------------------
+
+def interpret_persona(persona_vector):
+
+    mean_val = float(np.mean(persona_vector))
+    std_val = float(np.std(persona_vector))
+    norm_val = float(np.linalg.norm(persona_vector))
+    max_val = float(np.max(persona_vector))
+    min_val = float(np.min(persona_vector))
+
+    summary = f"""
+Embedding statistics:
+Mean: {mean_val}
+Std: {std_val}
+L2 Norm: {norm_val}
+Max Activation: {max_val}
+Min Activation: {min_val}
+
+Infer:
+- Communication style
+- Emotional stability
+- Confidence level
+- Social energy
+Keep it short and structured.
+"""
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": "llama-3.1-8b-instant",   # smaller model
+        "messages": [
+            {"role": "system", "content": "You analyze psychological embedding summaries."},
+            {"role": "user", "content": summary}
+        ],
+        "temperature": 0.3,
+        "max_tokens": 200
+    }
+
+    response = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers=headers,
+        json=payload
+    )
+
+    if response.status_code != 200:
+        return "Persona interpretation unavailable."
+
+    result = response.json()
+    return result["choices"][0]["message"]["content"]
+
+# -----------------------
+# Emotion-Aware Response (STRONG MODEL)
 # -----------------------
 
 def generate_response(persona_vector, user_text):
@@ -72,14 +100,13 @@ def generate_response(persona_vector, user_text):
     prompt = f"""
 You are an emotionally intelligent assistant.
 
-Persona vector (512-dim latent embedding):
-{persona_vector}
-
 User message:
 {user_text}
 
+Use the latent persona signal (embedding norm={np.linalg.norm(persona_vector):.2f}) 
+to subtly adapt tone and depth.
+
 Generate a supportive, emotionally aligned response.
-Keep it natural and human.
 """
 
     headers = {
@@ -100,8 +127,7 @@ Keep it natural and human.
     response = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers=headers,
-        json=payload,
-        timeout=60
+        json=payload
     )
 
     if response.status_code != 200:
@@ -111,89 +137,74 @@ Keep it natural and human.
     return result["choices"][0]["message"]["content"]
 
 # -----------------------
-# Streamlit UI
+# UI
 # -----------------------
 
-st.set_page_config(page_title="MEPE", layout="wide")
+st.set_page_config(page_title="MEPE", layout="centered")
 
 st.markdown("""
 <style>
-.big-title {
-    font-size: 42px;
-    font-weight: 800;
-}
-.subtle {
-    color: #888;
-}
-.persona-card {
-    padding: 20px;
+.stButton > button {
+    height: 60px;
+    font-size: 18px;
+    font-weight: 600;
     border-radius: 15px;
-    background-color: #111;
-}
-.response-card {
-    padding: 20px;
-    border-radius: 15px;
-    background-color: #1a1a1a;
+    background: linear-gradient(90deg, #6C63FF, #00D4FF);
+    color: white;
+    border: none;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="big-title">🧠 MEPE</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtle">Multimodal Emotion Persona Engine</div>', unsafe_allow_html=True)
+st.title("🧠 MEPE")
+st.caption("Multimodal Emotion Persona Engine")
 
-st.divider()
+st.markdown("### 📝 Input Signals")
+text_input = st.text_area("Message")
+image_input = st.file_uploader("Face Image", type=["png", "jpg", "jpeg"])
 
-col1, col2 = st.columns([1, 1])
+generate = st.button("🚀 Analyze Persona & Generate Response", use_container_width=True)
 
-with col1:
-    st.markdown("### 📝 Input Signals")
-    text_input = st.text_area("Message")
-    image_input = st.file_uploader("Face Image", type=["png", "jpg", "jpeg"])
-
-with col2:
-    st.markdown("### 🔍 Detected Persona")
-    persona_placeholder = st.empty()
-
-st.divider()
-
-if st.button("Generate Emotion-Aware Response", use_container_width=True):
+if generate:
 
     if not text_input or not image_input:
         st.error("Both text and image required.")
     else:
 
-        with st.spinner("Extracting multimodal persona representation..."):
+        with st.spinner("Extracting multimodal embedding..."):
             image_bytes = image_input.read()
             persona_vector, error = get_persona_embedding(text_input, image_bytes)
 
         if error:
             st.error(error)
+
         else:
 
-            persona_info = summarize_persona(persona_vector)
+            st.markdown("## 🔍 Detected Persona")
 
-            with persona_placeholder.container():
-                st.markdown("#### 🎭 Persona Profile")
-                st.markdown(f"**Type:** {persona_info['persona_type']}")
-                st.markdown(f"**Embedding Dimension:** 512")
-                st.metric("Emotional Intensity", persona_info["emotional_intensity"])
-                st.progress(min(persona_info["emotional_intensity"] / 50, 1.0))
+            col1, col2 = st.columns(2)
 
-                with st.expander("Technical Details"):
-                    st.write("Raw Embedding (first 10 dims):")
-                    st.write(persona_vector[:10])
+            with col1:
+                st.metric("Embedding Dimension", "512")
+                st.metric("Vector Norm", round(np.linalg.norm(persona_vector), 2))
 
-            with st.spinner("Generating persona-aligned response..."):
+            with col2:
+                st.metric("Mean Activation", round(np.mean(persona_vector), 4))
+                st.metric("Std Deviation", round(np.std(persona_vector), 4))
+
+            with st.spinner("Interpreting persona traits..."):
+                persona_summary = interpret_persona(persona_vector)
+
+            st.markdown("### 🎭 Behavioral Interpretation")
+            st.info(persona_summary)
+
+            st.markdown("---")
+
+            with st.spinner("Generating emotion-aware response..."):
                 reply = generate_response(persona_vector, text_input)
 
-            st.divider()
-            st.markdown("### 🤖 Emotion-Aware Response")
+            st.markdown("## 🤖 Emotion-Aware Response")
+            st.success(reply)
 
-            st.markdown("""
-            <div class="response-card">
-            """, unsafe_allow_html=True)
-
-            st.write(reply)
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
+            with st.expander("Technical View (Embedding Sample)"):
+                st.write(persona_vector[:20])
