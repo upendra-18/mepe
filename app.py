@@ -17,7 +17,23 @@ html, body, [class*="css"]  {
     font-family: 'Inter', sans-serif;
 }
 
-/* Full width primary button */
+/* Equal height containers */
+.equal-box {
+    height: 260px;
+}
+
+/* Text area styling */
+textarea {
+    height: 260px !important;
+    font-size: 16px !important;
+}
+
+/* Camera container styling */
+[data-testid="stCameraInput"] {
+    height: 260px !important;
+}
+
+/* Full width gradient button */
 div.stButton > button {
     width: 100%;
     height: 70px;
@@ -93,7 +109,7 @@ def get_persona_embedding(text, image_bytes):
         return None, str(e)
 
 # --------------------------------------------------
-# PERSONA INTERPRETER (LLM)
+# PERSONA INTERPRETER
 # --------------------------------------------------
 
 def interpret_persona(persona_vector):
@@ -101,15 +117,13 @@ def interpret_persona(persona_vector):
     prompt = f"""
 You are a behavioral AI analyst.
 
-This is a fused multimodal embedding (text + face):
-
+Multimodal embedding:
 {persona_vector}
 
-Summarize clearly in 3 lines:
+Summarize clearly in 3 short lines:
 - Communication style
 - Emotional tone
 - Energy level
-Keep it concise.
 """
 
     headers = {
@@ -120,7 +134,7 @@ Keep it concise.
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [
-            {"role": "system", "content": "You interpret behavioral embeddings."},
+            {"role": "system", "content": "Interpret behavioral embeddings."},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.4,
@@ -156,8 +170,7 @@ Embedding:
 User Message:
 {user_text}
 
-Generate a response aligned with the persona.
-Adapt tone and emotional intensity accordingly.
+Generate a persona-aligned response.
 """
 
     headers = {
@@ -193,23 +206,21 @@ Adapt tone and emotional intensity accordingly.
 # --------------------------------------------------
 
 st.markdown("## 🧠 MEPE – Multimodal Emotion Persona Engine")
-
 st.markdown("")
 
-# 50 / 50 GRID (FULL WIDTH)
+# Equal 50/50 grid
 col1, col2 = st.columns(2)
 
 with col1:
     st.markdown('<div class="section-title">📝 Input Signals</div>', unsafe_allow_html=True)
-    text_input = st.text_area("", height=220, placeholder="Enter your message...")
+    text_input = st.text_area("", placeholder="Enter your message...")
 
 with col2:
-    st.markdown('<div class="section-title">📷 Face Input</div>', unsafe_allow_html=True)
-    image_input = st.file_uploader("", type=["png", "jpg", "jpeg"])
+    st.markdown('<div class="section-title">📷 Face Input (Live Camera)</div>', unsafe_allow_html=True)
+    image_input = st.camera_input("")
 
 st.markdown("")
 
-# FULL WIDTH BUTTON
 generate = st.button("🚀 Generate Persona-Aware Response")
 
 st.markdown("")
@@ -221,7 +232,7 @@ st.markdown("")
 if generate:
 
     if not text_input or not image_input:
-        st.error("Both text and image are required.")
+        st.error("Both text and camera image are required.")
     else:
 
         with st.spinner("Extracting multimodal embedding..."):
@@ -230,7 +241,6 @@ if generate:
 
         if error:
             st.error(error)
-
         else:
 
             with st.spinner("Interpreting persona..."):
@@ -238,11 +248,7 @@ if generate:
 
             st.markdown("### 🔍 Detected Persona")
             st.markdown(
-                f"""
-                <div class="persona-box">
-                {persona_summary}
-                </div>
-                """,
+                f"<div class='persona-box'>{persona_summary}</div>",
                 unsafe_allow_html=True
             )
 
@@ -253,10 +259,6 @@ if generate:
 
             st.markdown("### 🤖 Generated Response")
             st.markdown(
-                f"""
-                <div class="response-box">
-                {reply}
-                </div>
-                """,
+                f"<div class='response-box'>{reply}</div>",
                 unsafe_allow_html=True
             )
