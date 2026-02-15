@@ -13,13 +13,20 @@ st.set_page_config(page_title="MEPE", layout="wide")
 st.markdown("""
 <style>
 
-html, body, [class*="css"]  {
-    font-family: 'Inter', sans-serif;
+/* Remove default streamlit padding */
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
 }
 
-/* Equal height containers */
-.equal-box {
-    height: 260px;
+/* Remove vertical spacing between widgets */
+div[data-testid="stVerticalBlock"] > div {
+    margin-bottom: 0rem;
+}
+
+/* Global font */
+html, body, [class*="css"]  {
+    font-family: 'Inter', sans-serif;
 }
 
 /* Text area styling */
@@ -28,9 +35,15 @@ textarea {
     font-size: 16px !important;
 }
 
-/* Camera container styling */
-[data-testid="stCameraInput"] {
+/* Camera styling */
+div[data-testid="stCameraInput"] {
     height: 260px !important;
+}
+
+/* Remove widget bottom spacing */
+div.stTextArea,
+div[data-testid="stCameraInput"] {
+    margin-bottom: 0rem !important;
 }
 
 /* Full width gradient button */
@@ -206,9 +219,7 @@ Generate a persona-aligned response.
 # --------------------------------------------------
 
 st.markdown("## 🧠 MEPE – Multimodal Emotion Persona Engine")
-st.markdown("")
 
-# Equal 50/50 grid
 col1, col2 = st.columns(2)
 
 with col1:
@@ -217,21 +228,9 @@ with col1:
 
 with col2:
     st.markdown('<div class="section-title">📷 Face Input (Live Camera)</div>', unsafe_allow_html=True)
-    st.markdown('<div style="height:260px;">', unsafe_allow_html=True)
-    image_input = st.camera_input(
-        "Capture Face",
-        key="camera",
-        help="Use live camera capture"
-    )
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-st.markdown("")
+    image_input = st.camera_input("")
 
 generate = st.button("🚀 Generate Persona-Aware Response")
-
-st.markdown("")
 
 # --------------------------------------------------
 # EXECUTION
@@ -259,8 +258,6 @@ if generate:
                 f"<div class='persona-box'>{persona_summary}</div>",
                 unsafe_allow_html=True
             )
-
-            st.markdown("")
 
             with st.spinner("Generating response..."):
                 reply = generate_response(persona_vector, persona_summary, text_input)
